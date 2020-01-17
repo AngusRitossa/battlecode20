@@ -12,8 +12,12 @@ public class Miner extends RobotPlayer {
     }
 
     public static void doAction() throws GameActionException {
-
+        updateKnownRefineries();
+        updateKnownDesignSchools();
         if (!rc.isReady()) {
+            return;
+        }
+        if (tryBuildDesignSchool()) {
             return;
         }
         if (tryMineSoup()) {
@@ -99,7 +103,6 @@ public class Miner extends RobotPlayer {
     public static int numTurnsNearRefineryWithSoup = 0;
 
     public static boolean tryMoveTowardsRefinery() throws GameActionException { // Also deposits soup if possible
-    	updateKnownRefineries();
     	if (rc.getSoupCarrying() == RobotType.MINER.soupLimit) {
     		numTurnsFullSoup++;
     		// Find nearest refinery
@@ -206,6 +209,52 @@ public class Miner extends RobotPlayer {
                	}
             }
         }
+    }
+
+    public static void updateKnownDesignSchools() throws GameActionException {
+        for (int i = knownDesignSchools.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownDesignSchools.get(i))) {
+                MapLocation loc = knownDesignSchools.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.DESIGN_SCHOOL) {
+                    knownDesignSchools.remove(i);
+                    // send message proclaiming the death
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static boolean tryBuildDesignSchool() throws GameActionException {
+        // Currently, near (but >= distance 9) to the HQ will build a design school
+        if (knownDesignSchools.size() == 0) {
+            if (hqLoc != null && rc.getLocation().distanceSquaredTo(hqLoc) <= 20) {
+                // Double check there are no nearby design schools
+                RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
+                for (RobotInfo robot : robots) {
+                    if (robot.type == RobotType.DESIGN_SCHOOL) {
+                        knownDesignSchools.add(robot.location);      
+                        return false;
+                    }
+                }
+
+                System.out.println("I want to build a design school!");
+                Direction bestDir = null;
+                for (Direction dir : directions) {
+                    if (rc.canBuildRobot(RobotType.DESIGN_SCHOOL, dir) && rc.adjacentLocation(dir).distanceSquaredTo(hqLoc) >= 9 &&
+                            (bestDir == null || rc.senseElevation(rc.adjacentLocation(dir)) > rc.senseElevation(rc.adjacentLocation(bestDir)))) {
+                        bestDir = dir;
+                    }
+                }
+                if (bestDir != null && tryBuildInDir(RobotType.DESIGN_SCHOOL, bestDir, true)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
 }

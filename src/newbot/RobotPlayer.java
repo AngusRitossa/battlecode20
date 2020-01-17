@@ -35,6 +35,7 @@ public strictfp class RobotPlayer {
     public static ArrayList<MapLocation> knownRefineries = new ArrayList<MapLocation>(); // includes HQ
     public static ArrayList<MapLocation> knownRefineriesWithSoup = new ArrayList<MapLocation>(); // that that have soup near them 
     public static ArrayList<MapLocation> unreachableRefineries = new ArrayList<MapLocation>(); 
+    public static ArrayList<MapLocation> knownDesignSchools = new ArrayList<MapLocation>();
 
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
@@ -342,6 +343,8 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_HQ_LOC = 1;
     public static final int MESSAGE_TYPE_REFINERY_LOC = 2;
     public static final int MESSAGE_TYPE_REFINERY_IS_DEAD = 3;
+    public static final int MESSAGE_TYPE_DESIGN_SCHOOL_LOC = 4;
+    public static final int MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD = 5;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -420,6 +423,16 @@ public strictfp class RobotPlayer {
                 knownRefineries.add(loc);
                 knownRefineriesWithSoup.add(loc);
             }
+        } else if (message[0] == MESSAGE_TYPE_DESIGN_SCHOOL_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            MapLocation loc = new MapLocation(x, y);
+            knownDesignSchools.add(loc);
+        } else if (message[0] == MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            MapLocation loc = new MapLocation(x, y);
+            knownDesignSchools.remove(loc);
         }
     }
 

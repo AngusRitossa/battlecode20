@@ -28,7 +28,7 @@ public class HQ extends RobotPlayer {
     public static int minersBuilt = 0;
     public static boolean tryBuildMiner() throws GameActionException {
         // TODO: Don't just build miners
-        if (minersBuilt > 10) {
+        if (minersBuilt >= 8 || minersBuilt >= rc.getRoundNum()/40 + 2) {
             return false;
         }
         for (Direction dir : directions) {
