@@ -32,6 +32,9 @@ public strictfp class RobotPlayer {
     public static int startRoundNum;
     public static int roundNum;
     public static MapLocation hqLoc = null; // Location of HQ.
+    public static ArrayList<MapLocation> knownRefineries = new ArrayList<MapLocation>(); // includes HQ
+    public static ArrayList<MapLocation> knownRefineriesWithSoup = new ArrayList<MapLocation>(); // that that have soup near them 
+    public static ArrayList<MapLocation> unreachableRefineries = new ArrayList<MapLocation>(); 
 
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
@@ -153,11 +156,7 @@ public strictfp class RobotPlayer {
         } else return false;
     }
 
-    public static int manhattanDistance(MapLocation a, MapLocation b) {
-        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-    }
-
-    public static final int SOUP_RESERVE_START = 225;
+    public static final int SOUP_RESERVE_START = 100;
     public static int soupReserve() {
         // Current formula is kinda arbitrary
         if (roundNum < SOUP_RESERVE_START) {
@@ -176,8 +175,267 @@ public strictfp class RobotPlayer {
         }
     }
 
+    public static boolean tryMove(Direction dir) throws GameActionException {
+        if (rc.canMove(dir) && (rc.getType() == RobotType.DELIVERY_DRONE || !rc.senseFlooding(rc.adjacentLocation(dir)))) {
+            rc.move(dir);
+            return true;
+        } else {
+            return false;
+        }
+    }
+    // This is just move function taken from okbot
+    // TODO: Make a new nav function
+    public static MapLocation destination = null;
+    public static int bestSoFar = 0;
+    // which direction to start your checks in the next bugnav move
+    public static int startDir = -1;
+    // whether to search clockwise (as opposed to anticlockwise) in bugnav
+    public static boolean clockwise = false;
+    // number of turns in which startDir has been missing in a row
+    public static int startDirMissingInARow = 0;
     public static boolean tryMoveTowards(MapLocation loc) throws GameActionException {
-        // TODO: Implement bug nav or something
-        // It is actually a lot more non-trivial than I originally thought when I set out to do it
-    } 
+
+        // New movement function
+        // Implements something based on bugnav but not quite
+        // Has a few heuristics that hopefully will make it faster as opposed to degenerate
+        // Has some safeguards to deal with the fact that there are other robots in the way, not just stationary obstacles
+
+        // TODO: figure out how best to deal with destination changing
+        // TODO: senseFlooding to avoid drowning
+        // TODO: precalc which adjacent squares are about to be flooded in the next turn for even better non-drowning
+
+        if (rc.getType() == RobotType.DELIVERY_DRONE) {
+            drawError("don't use this function for drones");
+        }
+        // Stores whether there is an enemy drone adjacent to this dir
+        // TODO: maybe can use this for flooding too?
+        boolean[] dangerousDir = new boolean[8];
+        RobotInfo[] enemies = rc.senseNearbyRobots(18, rc.getTeam().opponent());
+        for (RobotInfo enemy : enemies) {
+            if (enemy.type == RobotType.DELIVERY_DRONE) {
+                for (int i = 0; i < 8; i++) {
+                    if (rc.adjacentLocation(directions[i]).distanceSquaredTo(enemy.location) <= 8) {
+                        dangerousDir[i] = true;
+                    }
+                }
+            }
+        }
+
+        if (destination == null || !loc.equals(destination)) {
+            destination = loc;
+            bestSoFar = 99999;
+            startDir = -1;
+            clockwise = Math.random() < 0.5;
+            startDirMissingInARow = 0;
+        }
+
+        if (rc.getLocation().equals(loc)) {
+            drawWarning("already at destination");
+            return false;
+        }
+
+        int dist = hybridDistance(rc.getLocation(), destination);
+        if (dist < bestSoFar) {
+            bestSoFar = dist;
+            startDir = rc.getLocation().directionTo(destination).ordinal();
+
+            // Refresh choice of anticlockwise vs clockwise based on which one moves closer to the destination
+            // If they are equally close, prefer the current direction
+            int firstDist = -1; // Distance if you move in the current clockwise/anticlockwise direction
+            int lastDist = -1; // Distance if you move in the opposite direction
+            int dir = startDir;
+            for (int i = 0; i < 8; i++) {
+                MapLocation next = rc.adjacentLocation(directions[dir]);
+                // TODO: sense squares which are not flooded but will be next turn
+                if (rc.onTheMap(next) && !dangerousDir[dir] && rc.canMove(directions[dir]) &&
+                        !rc.senseFlooding(rc.adjacentLocation(directions[dir]))) {
+                    int nextDist = hybridDistance(next, destination);
+                    if (firstDist == -1) {
+                        firstDist = nextDist;
+                    }
+                    lastDist = nextDist;
+                }
+                if (clockwise) dir = (dir + 1) % 8;
+                else dir = (dir + 7) % 8;
+            }
+            System.out.println("clockwise = " + clockwise + ", firstDist = " + firstDist + ", lastDist = " + lastDist);
+            if (lastDist < firstDist) {
+                // Switch directions
+                clockwise = !clockwise;
+            }
+        }
+
+        System.out.println("startDir = " + startDir + ", clockwise = " + clockwise);
+        if (!rc.onTheMap(rc.adjacentLocation(directions[startDir]))) {
+            startDir = rc.getLocation().directionTo(destination).ordinal();
+            drawWarning("starting dir should not point off the map");
+        }
+        int dir = startDir;
+        for (int i = 0; i < 8; i++) {
+            MapLocation next = rc.adjacentLocation(directions[dir]);
+            // If you hit the edge of the map, reverse direction
+            if (!rc.onTheMap(next)) {
+                clockwise = !clockwise;
+                dir = startDir;
+            } else if (!dangerousDir[dir] && tryMove(directions[dir])) {
+                // Safeguard 1: dir might equal startDir if this robot was blocked by another robot last turn
+                // that has since moved.
+                if (dir != startDir) {
+                    if (clockwise) startDir = dir % 2 == 1 ? (dir + 5) % 8 : (dir + 6) % 8;
+                    else startDir = dir % 2 == 1 ? (dir + 3) % 8 : (dir + 2) % 8;
+
+                    startDirMissingInARow = 0;
+                } else {
+                    // Safeguard 2: If the obstacle that should be at startDir is missing 2/3 turns in a row
+                    // reset startDir to point towards destination
+                    if (++startDirMissingInARow == 3) {
+                        startDir = rc.getLocation().directionTo(destination).ordinal();
+                        startDirMissingInARow = 0;
+                    }
+                }
+                // Rare occasion when startDir gets set to Direction.CENTER
+                if (startDir == 8) {
+                    startDir = 0;
+                }
+                // Safeguard 3: If startDir points off the map, reset startDir towards destination
+                if (!rc.onTheMap(rc.adjacentLocation(directions[startDir]))) {
+                    startDir = rc.getLocation().directionTo(destination).ordinal();
+                }
+                rc.setIndicatorLine(rc.getLocation(), loc, 255, 255, 255);
+                rc.setIndicatorDot(rc.adjacentLocation(directions[startDir]), 127, 127, 255);
+                return true;
+            }
+
+            if (clockwise) dir = (dir + 1) % 8;
+            else dir = (dir + 7) % 8;
+        }
+
+        return false;
+    }
+    // hybrid between manhattan distance (dx + dy) and max distance max(dx, dy)
+    public static int hybridDistance(MapLocation a, MapLocation b) {
+        int dy = Math.abs(a.y - b.y);
+        int dx = Math.abs(a.x - b.x);
+        return dy + dx + Math.max(dy, dx);
+    }
+    public static int manhattanDistance(MapLocation a, MapLocation b) {
+        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+
+
+    public static void findHQ() throws GameActionException {
+        // HQ loc should be known via blockchain, if not check it using senseNearbyRobots
+        if (hqLoc == null) {
+            RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
+            for (RobotInfo robot : robots) {
+                if (robot.type == RobotType.HQ) {
+                    hqLoc = robot.location;
+                    return;
+                }
+            }
+        }   
+    }
+
+
+    // Blockchain 
+
+    public static final int MESSAGE_TYPE_HQ_LOC = 1;
+    public static final int MESSAGE_TYPE_REFINERY_LOC = 2;
+    public static final int MESSAGE_TYPE_REFINERY_IS_DEAD = 3;
+
+    public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
+    public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
+        if (message[6] != 0) {
+            drawError("don't use last spot in message");
+        }
+        int k = 0;
+        for (int i = 0; i < 6; i++ ) {
+            k = (k + message[i]) % 42069;
+        }
+        if (rc.getTeam() == Team.A) {
+            k += 666;
+        }
+        k %= 42069;
+        message[6] = k;
+        for (int i = 0; i < 7; i++) {
+            message[i] ^= xorValues[i];
+        }
+        // xor the last value by the cost for *maximum* security 
+        message[6] ^= cost;
+
+        if (rc.canSubmitTransaction(message, cost)) {
+            rc.submitTransaction(message, cost);
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean decodeBlockchain(int[] message, int cost) throws GameActionException {
+        // Returns false if its not our message, true if it (probably) is
+        for (int i = 0; i < 7; i++) {
+            message[i] ^= xorValues[i];
+        }
+        message[6] ^= cost;
+
+        int k = 0;
+        for (int i = 0; i < 6; i++ ) {
+            k = (k + message[i]) % 42069;
+        }
+        if (rc.getTeam() == Team.A) {
+            k += 666;
+        }
+        k %= 42069;
+
+        return k == message[6];
+    }
+
+    public static int currBlock = 1;
+    public static void readBlockchain(int bytecodeLimit) throws GameActionException {
+        while (currBlock < roundNum && Clock.getBytecodesLeft() > bytecodeLimit) {
+            Transaction[] transactions = rc.getBlock(currBlock);
+            for (Transaction transaction : transactions) {
+                int[] message = transaction.getMessage();
+                int cost = transaction.getCost();
+                if (decodeBlockchain(message, cost)) {
+                    interpretBlockchain(message, cost);
+                }
+            }
+            currBlock++;
+        }
+    }
+
+    public static void interpretBlockchain(int[] message, int cost) throws GameActionException {
+        if (message[0] == MESSAGE_TYPE_HQ_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            hqLoc = new MapLocation(x, y);
+            knownRefineries.add(hqLoc);
+            knownRefineriesWithSoup.add(hqLoc);
+            System.out.println("Our HQ location: " + x + " " + y);
+        } else if (message[0] == MESSAGE_TYPE_REFINERY_LOC) {
+            if (rc.getType() == RobotType.MINER) {
+                int x = message[1] / MAX_MAP_SIZE;
+                int y = message[1] % MAX_MAP_SIZE;
+                MapLocation loc = new MapLocation(x, y);
+                knownRefineries.add(loc);
+                knownRefineriesWithSoup.add(loc);
+            }
+        }
+    }
+
+
+    // Random movement
+    public static int turnStartedLastMovement = -9999;
+    public static MapLocation randomSquareMovingTowards = null;
+    public static boolean tryMoveRandomly() throws GameActionException {
+        // Picks a random square on the board and moves towards it
+        if (randomSquareMovingTowards == null || rc.getRoundNum() - turnStartedLastMovement >= 50 || rc.getLocation().distanceSquaredTo(randomSquareMovingTowards) < 20) {
+            int x = (int) (Math.random() * rc.getMapWidth());
+            int y = (int) (Math.random() * rc.getMapWidth());
+            randomSquareMovingTowards = new MapLocation(x, y);
+            turnStartedLastMovement = rc.getRoundNum();
+        }
+        System.out.println("Moving randomly towards: " + randomSquareMovingTowards.x + " " + randomSquareMovingTowards.y);
+        return tryMoveTowards(randomSquareMovingTowards);
+    }
 }
