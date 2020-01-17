@@ -24,7 +24,7 @@ public class DesignSchool extends RobotPlayer {
 
     public static int landscapersBuilt = 0;
     public static boolean tryBuildLandscaper() throws GameActionException {
-    	if (landscapersBuilt >= 10) {
+    	if (landscapersBuilt >= 20) {
     		// TODO: Not this
     		return false;
     	}

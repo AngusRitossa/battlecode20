@@ -245,7 +245,8 @@ public class Miner extends RobotPlayer {
                 Direction bestDir = null;
                 for (Direction dir : directions) {
                     if (rc.canBuildRobot(RobotType.DESIGN_SCHOOL, dir) && rc.adjacentLocation(dir).distanceSquaredTo(hqLoc) >= 9 &&
-                            (bestDir == null || rc.senseElevation(rc.adjacentLocation(dir)) > rc.senseElevation(rc.adjacentLocation(bestDir)))) {
+                            (bestDir == null || rc.senseElevation(rc.adjacentLocation(dir)) > rc.senseElevation(rc.adjacentLocation(bestDir))) &&
+                            !canBeDugForLowerTurtle(rc.adjacentLocation(dir))) {
                         bestDir = dir;
                     }
                 }

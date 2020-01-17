@@ -10,6 +10,7 @@ public class Landscaper extends RobotPlayer {
     }
 
     public static void doAction() throws GameActionException {
+    	updateAdjHQSquares();
         if (!rc.isReady()) {
             return;
         }
@@ -22,6 +23,13 @@ public class Landscaper extends RobotPlayer {
         if (tryFormHQTurtle()) {
         	return;
         }
+        if (tryMakeLowerTurtle()) {
+        	return;
+        }
+        if (tryMoveInLowerTurtle()) {
+        	return;
+        }
+
     }
 
     public static boolean tryDefendBuilding() throws GameActionException {
@@ -97,7 +105,9 @@ public class Landscaper extends RobotPlayer {
     		if (tryDigDirtForTurtle(hqLoc)) {
     			return true;
     		}
-
+    		return false;
+    	}
+    	if (noFreeSquaresAdjHQ()) {
     		return false;
     	}
     	return tryMoveTowards(hqLoc);
@@ -157,5 +167,115 @@ public class Landscaper extends RobotPlayer {
     		}
     	}
     	return false;
+    }
+
+    public static boolean adjHQSquaresClaimed[] = new boolean[8]; // stores for each square adjacent to the hq, if it has a unit on it
+   	public static final int sizeOfLowerTurtle = 50; // d^2 around hq to make lower turtle
+   	public static boolean noFreeSquaresAdjHQ() throws GameActionException {
+   		for (int i = 0; i < adjHQSquaresClaimed.length; i++) {
+   			if (!adjHQSquaresClaimed[i]) {
+   				return false;
+   			}
+   		}
+   		return true;
+   	}
+    public static void updateAdjHQSquares() throws GameActionException {
+    	if (hqLoc == null) {
+    		return;
+    	}
+    	for (int i = 0; i < directions.length; i++) {
+    		MapLocation loc = hqLoc.add(directions[i]);
+    		if (rc.canSenseLocation(loc)) {
+    			// Conditions for square adj HQ being claimed: 
+    			// - > 5 height above us
+    			// - has a unit on it (note this doesn't check for unit type or team)
+    			if (rc.senseElevation(loc)-5 > rc.senseElevation(rc.getLocation())
+    				|| rc.senseRobotAtLocation(loc) != null) {
+    				adjHQSquaresClaimed[i] = true;
+    			} else {
+    				adjHQSquaresClaimed[i] = false;
+    			}
+    		}
+    	}
+    }
+
+    public static int getTowerTurtleHeight() throws GameActionException {
+    	// Desired of the 'lower turtle' (large area around the hq)
+    	for (int i = 0; i < 100; i++) {
+    		if (water_level_round[i] >= rc.getRoundNum()) {
+    			return i+2 + i/5;
+    		}
+    	}
+    	return 105;
+    }
+    public static boolean canBeRaisedForLowerTurtle(MapLocation loc) throws GameActionException {
+    	// Checks that the square isn't too low (if its too low, just give up on it)
+    	// Checks that its not a square we are lowering
+    	// Checks it doesn't contain a friendly building
+    	// Checks if its within d^2 35 of HQ
+    	if (hqLoc == null || hqLoc.distanceSquaredTo(loc) > sizeOfLowerTurtle) {
+    		return false;
+    	}
+    	if (rc.canSenseLocation(loc)) {
+    		if (rc.senseElevation(loc) < -20 || canBeDugForLowerTurtle(loc)) {
+    			return false;
+    		}
+    		RobotInfo robot = rc.senseRobotAtLocation(loc);
+    		if (robot != null && robot.team == rc.getTeam() && robot.type.isBuilding()) {
+    			return false;
+    		}
+    		return true;
+    	} else {
+    		return false;
+    	}
+    }
+
+    public static boolean tryMakeLowerTurtle() throws GameActionException {
+    	if (rc.getDirtCarrying() == 0) {
+    		// Dig for the lower turtle
+    		for (Direction dir : directions) {
+    			MapLocation loc = rc.getLocation().add(dir);
+    			if (canBeDugForLowerTurtle(loc) && rc.canDigDirt(dir)) {
+    				System.out.println("Digging dirt to form lower turtle");
+    				rc.digDirt(dir);
+    				return true;
+    			}
+    		}
+    		return false;
+    	} else {
+    		// Find adj square that is below what we want it to be, raise it
+    		int turtleHeight = getTowerTurtleHeight();
+    		for (Direction dir : Direction.values()) {
+    			MapLocation loc = rc.getLocation().add(dir);
+    			if (canBeRaisedForLowerTurtle(loc) && rc.senseElevation(loc) < turtleHeight && rc.canDepositDirt(dir)) {
+    				rc.depositDirt(dir);
+    				System.out.println("Depositing dirt to form lower turtle");
+    				return true;
+    			}
+    		}
+    		return false;
+    	}
+    }
+
+    public static boolean tryMoveInLowerTurtle() throws GameActionException {
+    	// If we see a square in the lower turtle that needs us to raise it, walk towards it
+    	if (hqLoc == null) {
+    		return false;
+    	}
+    	int sensorRadius = rc.getCurrentSensorRadiusSquared();
+    	int turtleHeight = getTowerTurtleHeight();
+        for (int i = 0; i < offsetDist.length; i++) {
+            if (offsetDist[i] > sensorRadius) {
+                break;
+            }
+            MapLocation loc = rc.getLocation().translate(offsetX[i], offsetY[i]);
+            if (canBeRaisedForLowerTurtle(loc)) {
+                if (rc.senseElevation(loc) < turtleHeight) {
+                	System.out.println("Moving towards square that needs me");
+                	return tryMoveTowards(loc);
+                }
+            }
+        }
+        return false;
     }
 }

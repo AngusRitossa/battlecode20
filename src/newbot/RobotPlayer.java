@@ -451,4 +451,15 @@ public strictfp class RobotPlayer {
         System.out.println("Moving randomly towards: " + randomSquareMovingTowards.x + " " + randomSquareMovingTowards.y);
         return tryMoveTowards(randomSquareMovingTowards);
     }
+
+    // This function is here, rather than in landscaper, because miner needs to access it too
+    // TODO: Maybe clean up file stuff so that lower turtle stuff isn't split between multiple files
+    public static boolean canBeDugForLowerTurtle(MapLocation loc) throws GameActionException {
+        // Returns whether this square in the larger turtle can be dug from
+        // Should be the case that every square has such a square adj to it
+        if (hqLoc == null || loc == hqLoc) {
+            return false;
+        }
+        return (loc.x - hqLoc.x)%3 == 0 && (loc.y - hqLoc.y)%3 == 0;
+    }
 }
