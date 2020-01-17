@@ -197,7 +197,7 @@ public class Miner extends RobotPlayer {
                	RobotInfo robot = rc.senseRobotAtLocation(loc);
                	if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.REFINERY) {
                		knownRefineries.remove(i);
-               		knownRefineriesWithSoup.remove(i);
+               		knownRefineriesWithSoup.remove(loc);
                		// send message proclaiming the death
                		int[] message = new int[7];
                     message[0] = MESSAGE_TYPE_REFINERY_IS_DEAD;
