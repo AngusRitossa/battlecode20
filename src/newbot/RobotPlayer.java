@@ -37,6 +37,7 @@ public strictfp class RobotPlayer {
     public static ArrayList<MapLocation> unreachableRefineries = new ArrayList<MapLocation>(); 
     public static ArrayList<MapLocation> knownDesignSchools = new ArrayList<MapLocation>();
 
+    public static final int startTurtlingHQRound = 400;
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
      * If this method returns, the robot dies!
@@ -454,11 +455,19 @@ public strictfp class RobotPlayer {
 
     // This function is here, rather than in landscaper, because miner needs to access it too
     // TODO: Maybe clean up file stuff so that lower turtle stuff isn't split between multiple files
+    public static final int[] turtleDigOffsetX    = { -2, 2, 0, 0 };
+    public static final int[] turtleDigOffsetY    = { 0, 0, -2, 2 };
+    public static final int lowerTurtleHeight = 12;
     public static boolean canBeDugForLowerTurtle(MapLocation loc) throws GameActionException {
         // Returns whether this square in the larger turtle can be dug from
         // Should be the case that every square has such a square adj to it
         if (hqLoc == null || loc == hqLoc) {
             return false;
+        }
+        for (int i = 0; i < turtleDigOffsetX.length; i++) {
+            if (loc.x == hqLoc.x+turtleDigOffsetX[i] && loc.y == hqLoc.y+turtleDigOffsetY[i]) {
+                return true;
+            }
         }
         return (loc.x - hqLoc.x)%3 == 0 && (loc.y - hqLoc.y)%3 == 0;
     }
