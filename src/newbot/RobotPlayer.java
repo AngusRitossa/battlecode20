@@ -36,6 +36,7 @@ public strictfp class RobotPlayer {
     public static ArrayList<MapLocation> knownRefineriesWithSoup = new ArrayList<MapLocation>(); // that that have soup near them 
     public static ArrayList<MapLocation> unreachableRefineries = new ArrayList<MapLocation>(); 
     public static ArrayList<MapLocation> knownDesignSchools = new ArrayList<MapLocation>();
+    public static ArrayList<MapLocation> knownFulfillmentCenters = new ArrayList<MapLocation>();
 
     public static final int startTurtlingHQRound = 400;
     /**
@@ -345,6 +346,7 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_REFINERY_IS_DEAD = 3;
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_LOC = 4;
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD = 5;
+    public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_LOC = 6;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -446,6 +448,12 @@ public strictfp class RobotPlayer {
             knownRefineries.remove(loc);
             knownRefineriesWithSoup.remove(loc);
             System.out.println("refinery is dead via blockchain");
+        } else if (message[0] == MESSAGE_TYPE_FULFILLMENT_CENTER_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new fulfillment center via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            knownFulfillmentCenters.add(loc);
         } else {
             System.out.println("unknown message (this is probably bad)");
         }

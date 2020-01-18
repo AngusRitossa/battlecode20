@@ -28,7 +28,7 @@ public class Miner extends RobotPlayer {
         if (hangAroundHQ == 1 && rc.getRoundNum() >= startTurtlingHQRound && tryBeTurtleMiner()) {
             return;
         }
-        if (tryBuildDesignSchool(false)) {
+        if (tryBuildBuilding(false, RobotType.DESIGN_SCHOOL)) {
             return;
         }
         if (tryMineSoup()) {
@@ -45,6 +45,7 @@ public class Miner extends RobotPlayer {
         }
     }
 
+     public static boolean vaporatorBuilt = false; // we build a vaporator before anything else, bc money
     public static boolean tryBeTurtleMiner() throws GameActionException {
         // If we're not on the turtle, try to get on it
         // Otherwise, build a refinery or move randomly
@@ -72,11 +73,25 @@ public class Miner extends RobotPlayer {
             }
             return tryMoveTowards(hqLoc);
         }
-        if (knownDesignSchools.size() < 3) {
-            if (tryBuildDesignSchool(true)) {
+        if (vaporatorBuilt && knownDesignSchools.size() < 3 && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
+            if (tryBuildBuilding(true, RobotType.DESIGN_SCHOOL)) {
                 return true;
             } else {
                 // we really want to build this design school, so move in the hope of being able to
+                if (rc.getLocation().distanceSquaredTo(hqLoc) >= 40) {
+                    tryMoveTowards(hqLoc);
+                    return true;
+                } else {
+                    tryMoveRandomly();
+                    return true;
+                }
+            }
+        }
+        if (vaporatorBuilt && knownFulfillmentCenters.size() < 2) {
+        	if (tryBuildBuilding(true, RobotType.FULFILLMENT_CENTER)) {
+                return true;
+            } else {
+                // we really want to build this fulfillment center, so move in the hope of being able to
                 if (rc.getLocation().distanceSquaredTo(hqLoc) >= 40) {
                     tryMoveTowards(hqLoc);
                     return true;
@@ -119,6 +134,7 @@ public class Miner extends RobotPlayer {
             MapLocation loc = rc.getLocation().add(dir);
             if (isSuitableLocationForBuilding(loc)) {
                 if (tryBuildInDir(RobotType.VAPORATOR, dir, true)) {
+                	vaporatorBuilt = true;
                     return true;
                 }
             }
@@ -319,32 +335,33 @@ public class Miner extends RobotPlayer {
         }
     }
 
-    public static boolean tryBuildDesignSchool(boolean isOnTurtle) throws GameActionException {
+    public static boolean tryBuildBuilding(boolean isOnTurtle, RobotType buildingType) throws GameActionException {
         // Currently, near (but >= distance 9) to the HQ will build a design school
+        // Building type should be desi
         if (knownDesignSchools.size() == 0 || isOnTurtle) {
             if (hqLoc != null && rc.getLocation().distanceSquaredTo(hqLoc) <= 40) {
                 // Double check there are no nearby design schools
-                if (!isOnTurtle) {
+                if (!isOnTurtle && buildingType == RobotType.DESIGN_SCHOOL) {
                     RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
                     for (RobotInfo robot : robots) {
-                        if (robot.type == RobotType.DESIGN_SCHOOL) {
+                        if (robot.type == buildingType) {
                             knownDesignSchools.add(robot.location);      
                             return false;
                         }
                     }
                 }
 
-                System.out.println("I want to build a design school!");
+                System.out.println("I want to build a building! " + buildingType);
                 Direction bestDir = null;
                 for (Direction dir : directions) {
-                    if (rc.canBuildRobot(RobotType.DESIGN_SCHOOL, dir) && rc.adjacentLocation(dir).distanceSquaredTo(hqLoc) >= 16 &&
+                    if (rc.canBuildRobot(buildingType, dir) && rc.adjacentLocation(dir).distanceSquaredTo(hqLoc) >= 16 &&
                             (bestDir == null || rc.senseElevation(rc.adjacentLocation(dir)) > rc.senseElevation(rc.adjacentLocation(bestDir))) &&
                             (!isOnTurtle || isSuitableLocationForBuilding(rc.adjacentLocation(dir))) &&
                             !canBeDugForLowerTurtle(rc.adjacentLocation(dir))) {
                         bestDir = dir;
                     }
                 }
-                if (bestDir != null && tryBuildInDir(RobotType.DESIGN_SCHOOL, bestDir, true)) {
+                if (bestDir != null && tryBuildInDir(buildingType, bestDir, true)) {
                     return true;
                 }
             }

@@ -244,7 +244,6 @@ public class Landscaper extends RobotPlayer {
                         break;
                     }
                     MapLocation loc = rc.getLocation().translate(offsetX[i], offsetY[i]);
-                    System.out.println(Clock.getBytecodesLeft());
                     if (rc.onTheMap(loc) && shouldBeRaisedForLowerTurtle(loc)) {
                         if (bestLoc == null || 
                             (hqLoc.distanceSquaredTo(bestLoc) > hqLoc.distanceSquaredTo(loc))) {
