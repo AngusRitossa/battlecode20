@@ -25,7 +25,7 @@ public class Miner extends RobotPlayer {
         if (!rc.isReady()) {
             return;
         }
-        if (hangAroundHQ == 1 && rc.getRoundNum() >= 400 && tryBeTurtleMiner()) {
+        if (hangAroundHQ == 1 && rc.getRoundNum() >= startTurtlingHQRound && tryBeTurtleMiner()) {
             return;
         }
         if (tryBuildDesignSchool(false)) {
@@ -100,16 +100,14 @@ public class Miner extends RobotPlayer {
         if (rc.senseElevation(loc) != lowerTurtleHeight) {
             return false;
         }
-        for (Direction dir : directions) {
-            MapLocation adjLoc = loc.add(dir);
-            if (rc.canSenseLocation(adjLoc)) {
-                RobotInfo robot = rc.senseRobotAtLocation(adjLoc);
-                if (robot != null && robot.type.isBuilding()) {
-                    return false;
-                }
-            }
+        if (loc.distanceSquaredTo(hqLoc) <= 9) {
+            return false;
         }
-        return true;
+        RobotInfo robot = rc.senseRobotAtLocation(loc);
+        if (robot != null) {
+            return false;
+        }
+        return (loc.x - hqLoc.x)%3 != 0 && (loc.y - hqLoc.y)%3 != 0;
     }
     public static boolean tryBuildVaporator() throws GameActionException {
         // TODO: Be smart?

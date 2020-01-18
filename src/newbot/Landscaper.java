@@ -15,6 +15,7 @@ public class Landscaper extends RobotPlayer {
             return;
         }
         if (lastRoundBuiltTurtle == 9999) {
+            System.out.println("I am here yay");
             lastRoundBuiltTurtle = rc.getRoundNum();
         }
         if (tryDefendBuilding()) {
@@ -32,6 +33,7 @@ public class Landscaper extends RobotPlayer {
         if (tryMoveRandomly()) {
             return;
         }
+        System.out.println("I'm not doing anything, how sad");
     }
 
     public static boolean tryDefendBuilding() throws GameActionException {
@@ -113,6 +115,7 @@ public class Landscaper extends RobotPlayer {
         if (noFreeSquaresAdjHQ()) {
             return false;
         }
+        System.out.println("Trying to move towards hq loc");
         tryMoveTowards(hqLoc);
         return true;
     }
@@ -138,6 +141,7 @@ public class Landscaper extends RobotPlayer {
 
                 if (rc.senseElevation(loc) < lowestElevation && 
                     (rc.senseElevation(loc) < 0 || rc.getRoundNum() > 1000 || 
+                    (rc.senseElevation(loc) < lowerTurtleHeight && rc.getRoundNum() > startTurtlingHQRound) ||
                     (rc.senseElevation(loc) <= 99 && water_level_round[rc.senseElevation(loc)] <= rc.getRoundNum()+5))) {
                     lowestElevation = rc.senseElevation(loc);
                     bestLoc = loc;
@@ -171,11 +175,11 @@ public class Landscaper extends RobotPlayer {
         return false;
     }
 
-    public static boolean adjHQSquaresClaimed[] = new boolean[8]; // stores for each square adjacent to the hq, if it has a unit on it
+    public static int adjHQSquaresClaimed[] = new int[8]; // stores for each square adjacent to the hq, if it has a unit on it
     public static final int sizeOfLowerTurtle = 50; // d^2 around hq to make lower turtle
     public static boolean noFreeSquaresAdjHQ() throws GameActionException {
         for (int i = 0; i < adjHQSquaresClaimed.length; i++) {
-            if (!adjHQSquaresClaimed[i]) {
+            if (adjHQSquaresClaimed[i] == 1) {
                 return false;
             }
         }
@@ -189,13 +193,13 @@ public class Landscaper extends RobotPlayer {
             MapLocation loc = hqLoc.add(directions[i]);
             if (rc.canSenseLocation(loc)) {
                 // Conditions for square adj HQ being claimed: 
-                // - > 5 height above us
+                // - > 3 height above us
                 // - has a unit on it (note this doesn't check for unit type or team)
-                if (rc.senseElevation(loc)-5 > rc.senseElevation(rc.getLocation())
+                if (rc.senseElevation(loc)-3 > rc.senseElevation(rc.getLocation())
                     || rc.senseRobotAtLocation(loc) != null) {
-                    adjHQSquaresClaimed[i] = true;
+                    adjHQSquaresClaimed[i] = 2;
                 } else {
-                    adjHQSquaresClaimed[i] = false;
+                    adjHQSquaresClaimed[i] = 1;
                 }
             }
         }
@@ -245,7 +249,7 @@ public class Landscaper extends RobotPlayer {
                         if (bestLoc == null || 
                             (hqLoc.distanceSquaredTo(bestLoc) > hqLoc.distanceSquaredTo(loc))) {
                             bestLoc = loc;
-                            if (rc.getRoundNum()+15 > lastRoundBuiltTurtle) {
+                            if (rc.getRoundNum() > lastRoundBuiltTurtle+15) {
                                 // Fuck it, just do this square
                                 System.out.println("Can't reach desired square when building turtle");
                                 lastRoundGaveUpBuildingTurtleProperly = rc.getRoundNum();
