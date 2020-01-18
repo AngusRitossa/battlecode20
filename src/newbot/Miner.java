@@ -92,7 +92,7 @@ public class Miner extends RobotPlayer {
         return false;
     }
 
-    public static boolean isSuitableLocationForVaporator(MapLocation loc) throws GameActionException {
+    public static boolean isSuitableLocationForBuilding(MapLocation loc) throws GameActionException {
         // Currently just checks elevation == lowerTurtleHeight && does not contain an adjacent building
         if (!rc.canSenseLocation(loc)) {
             return false;
@@ -117,7 +117,7 @@ public class Miner extends RobotPlayer {
         }
         for (Direction dir : directions) {
             MapLocation loc = rc.getLocation().add(dir);
-            if (isSuitableLocationForVaporator(loc)) {
+            if (isSuitableLocationForBuilding(loc)) {
                 if (tryBuildInDir(RobotType.VAPORATOR, dir, true)) {
                     return true;
                 }
@@ -319,12 +319,12 @@ public class Miner extends RobotPlayer {
         }
     }
 
-    public static boolean tryBuildDesignSchool(boolean ignoreNumber) throws GameActionException {
+    public static boolean tryBuildDesignSchool(boolean isOnTurtle) throws GameActionException {
         // Currently, near (but >= distance 9) to the HQ will build a design school
-        if (knownDesignSchools.size() == 0 || ignoreNumber) {
+        if (knownDesignSchools.size() == 0 || isOnTurtle) {
             if (hqLoc != null && rc.getLocation().distanceSquaredTo(hqLoc) <= 40) {
                 // Double check there are no nearby design schools
-                if (!ignoreNumber) {
+                if (!isOnTurtle) {
                     RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
                     for (RobotInfo robot : robots) {
                         if (robot.type == RobotType.DESIGN_SCHOOL) {
@@ -339,6 +339,7 @@ public class Miner extends RobotPlayer {
                 for (Direction dir : directions) {
                     if (rc.canBuildRobot(RobotType.DESIGN_SCHOOL, dir) && rc.adjacentLocation(dir).distanceSquaredTo(hqLoc) >= 16 &&
                             (bestDir == null || rc.senseElevation(rc.adjacentLocation(dir)) > rc.senseElevation(rc.adjacentLocation(bestDir))) &&
+                            (!isOnTurtle || isSuitableLocationForBuilding(rc.adjacentLocation(dir))) &&
                             !canBeDugForLowerTurtle(rc.adjacentLocation(dir))) {
                         bestDir = dir;
                     }
