@@ -11,9 +11,19 @@ public class DesignSchool extends RobotPlayer {
     	doAction();
     	readBlockchain(1000);
     }
-
+    public static int isOnTurtle = -1;
     public static void doAction() throws GameActionException {
     	reportLocation();
+        if (isOnTurtle == -1) {
+            // check our elevation to see if its >= turtle elevation
+            if (rc.canSenseLocation(rc.getLocation())) {
+                if (rc.senseElevation(rc.getLocation()) >= lowerTurtleHeight) {
+                    isOnTurtle = 1;
+                } else {
+                    isOnTurtle = 0;
+                }
+            }
+        }
         if (!rc.isReady()) {
             return;
         }
@@ -21,16 +31,24 @@ public class DesignSchool extends RobotPlayer {
         	return;
         }
     }
+    public static int numberOfLandscapersWanted() {
+        if (isOnTurtle == 0) {
+            return 10;
+        } else {
+            return Math.min(10, rc.getRoundNum()/100);
+        }
+    }
 
     public static int landscapersBuilt = 0;
     public static boolean tryBuildLandscaper() throws GameActionException {
-    	if (landscapersBuilt >= 20) {
+    	if (landscapersBuilt >= numberOfLandscapersWanted()) {
     		// TODO: Not this
     		return false;
     	}
     	for (Direction dir : directions) {
             if (tryBuildInDir(RobotType.LANDSCAPER, dir, false)) {
                 landscapersBuilt++;
+                System.out.println("Building landscaper " + landscapersBuilt);
                 return true;
             }
         }

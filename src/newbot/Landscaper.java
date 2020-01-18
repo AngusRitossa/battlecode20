@@ -6,13 +6,16 @@ public class Landscaper extends RobotPlayer {
     public static void runLandscaper() throws GameActionException {
         readBlockchain(9000);
         doAction();
-        readBlockchain(1000);
+        readBlockchain(2000);
     }
 
     public static void doAction() throws GameActionException {
         updateAdjHQSquares();
         if (!rc.isReady()) {
             return;
+        }
+        if (lastRoundBuiltTurtle == 9999) {
+            lastRoundBuiltTurtle = rc.getRoundNum();
         }
         if (tryDefendBuilding()) {
             return;
@@ -59,6 +62,7 @@ public class Landscaper extends RobotPlayer {
                 }
             }
         }
+        
         return false;   
     }
 
@@ -109,7 +113,8 @@ public class Landscaper extends RobotPlayer {
         if (noFreeSquaresAdjHQ()) {
             return false;
         }
-        return tryMoveTowards(hqLoc);
+        tryMoveTowards(hqLoc);
+        return true;
     }
 
     public static boolean tryMakeTurtleAround(MapLocation turtleLoc) throws GameActionException {
@@ -226,24 +231,29 @@ public class Landscaper extends RobotPlayer {
             // Find lowest square we can see that needs raising - raise it or walk towards it
             int sensorRadius = rc.getCurrentSensorRadiusSquared();
             MapLocation bestLoc = null;
-            for (int i = 0; i < offsetDist.length; i++) {
-                if (offsetDist[i] > sensorRadius) {
-                    break;
-                }
-                MapLocation loc = rc.getLocation().translate(offsetX[i], offsetY[i]);
-                if (rc.onTheMap(loc) && shouldBeRaisedForLowerTurtle(loc)) {
-                    if (bestLoc == null || 
-                        (hqLoc.distanceSquaredTo(bestLoc) > hqLoc.distanceSquaredTo(loc)) ||
-                        (hqLoc.distanceSquaredTo(bestLoc) == hqLoc.distanceSquaredTo(loc) && rc.getLocation().isAdjacentTo(loc))) {
-                        bestLoc = loc;
-                        if (rc.getRoundNum()+15 > lastRoundBuiltTurtle) {
-                            // Fuck it, just do this square
-                            System.out.println("Can't reach desired square when building turtle");
-                            lastRoundGaveUpBuildingTurtleProperly = rc.getRoundNum();
-                            break;
-                        }
-                        if (lastRoundGaveUpBuildingTurtleProperly+15 > rc.getRoundNum()) {
-                            break;
+            if (rc.getRoundNum() >= water_level_round[lowerTurtleHeight]-2) {
+                // fuck it, just save ourself
+                bestLoc = rc.getLocation();
+            } else {
+                for (int i = 0; i < offsetDist.length; i++) {
+                    if (offsetDist[i] > sensorRadius) {
+                        break;
+                    }
+                    MapLocation loc = rc.getLocation().translate(offsetX[i], offsetY[i]);
+                    System.out.println(Clock.getBytecodesLeft());
+                    if (rc.onTheMap(loc) && shouldBeRaisedForLowerTurtle(loc)) {
+                        if (bestLoc == null || 
+                            (hqLoc.distanceSquaredTo(bestLoc) > hqLoc.distanceSquaredTo(loc))) {
+                            bestLoc = loc;
+                            if (rc.getRoundNum()+15 > lastRoundBuiltTurtle) {
+                                // Fuck it, just do this square
+                                System.out.println("Can't reach desired square when building turtle");
+                                lastRoundGaveUpBuildingTurtleProperly = rc.getRoundNum();
+                                break;
+                            }
+                            if (lastRoundGaveUpBuildingTurtleProperly+15 > rc.getRoundNum()) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -254,10 +264,13 @@ public class Landscaper extends RobotPlayer {
                     if (rc.canDepositDirt(dir)) {
                         rc.depositDirt(dir);
                         lastRoundBuiltTurtle = rc.getRoundNum();
+                        System.out.println("depositing dirt on lower turtle");
                         return true;
                     }
                 } else {
-                    return tryMoveTowards(bestLoc);
+                    System.out.println("moving towards bestloc " + Clock.getBytecodesLeft());
+                    tryMoveTowards(bestLoc);
+                    return true;
                 }
             } 
         }

@@ -14,13 +14,21 @@ public class Miner extends RobotPlayer {
     public static void doAction() throws GameActionException {
         updateKnownRefineries();
         updateKnownDesignSchools();
+        if (hangAroundHQ == -1) {
+            hangAroundHQ = (int) (Math.random() * 420);
+            hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
+            hangAroundHQ %= 3;
+            if (hangAroundHQ != 0) {
+                hangAroundHQ = 1;
+            }
+        }
         if (!rc.isReady()) {
             return;
         }
-        if (rc.getRoundNum() >= 400 && tryBeTurtleMiner()) {
+        if (hangAroundHQ == 1 && rc.getRoundNum() >= 400 && tryBeTurtleMiner()) {
             return;
         }
-        if (tryBuildDesignSchool()) {
+        if (tryBuildDesignSchool(false)) {
             return;
         }
         if (tryMineSoup()) {
@@ -47,7 +55,36 @@ public class Miner extends RobotPlayer {
         if (rc.senseElevation(rc.getLocation()) < lowerTurtleHeight) {
             // walk towards hq
             System.out.println("Trying to get onto turtle");
+            // if we are adjacent to the turtle, on a square that will be turtled, stay
+            boolean nextToTurtle = false;
+            for (Direction dir : directions) {
+                MapLocation loc = rc.getLocation().add(dir);
+                if (rc.canSenseLocation(loc) && rc.senseElevation(loc) == lowerTurtleHeight) {
+                    RobotInfo robot = rc.senseRobotAtLocation(loc);
+                    if (robot != null && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER) {
+                        nextToTurtle = true;
+                    }
+                }
+            }
+            if (nextToTurtle && !canBeDugForLowerTurtle(rc.getLocation())) {
+                System.out.println("staying still to be lifted onto turtle");
+                return true;
+            }
             return tryMoveTowards(hqLoc);
+        }
+        if (knownDesignSchools.size() < 3) {
+            if (tryBuildDesignSchool(true)) {
+                return true;
+            } else {
+                // we really want to build this design school, so move in the hope of being able to
+                if (rc.getLocation().distanceSquaredTo(hqLoc) >= 40) {
+                    tryMoveTowards(hqLoc);
+                    return true;
+                } else {
+                    tryMoveRandomly();
+                    return true;
+                }
+            }
         }
         if (tryBuildVaporator()) {
             return true;
@@ -76,6 +113,10 @@ public class Miner extends RobotPlayer {
     }
     public static boolean tryBuildVaporator() throws GameActionException {
         // TODO: Be smart?
+        if (rc.getRoundNum()+250 > water_level_round[lowerTurtleHeight]) {
+            // a vaporator won't pay itself off, so don't build
+            return false;
+        }
         for (Direction dir : directions) {
             MapLocation loc = rc.getLocation().add(dir);
             if (isSuitableLocationForVaporator(loc)) {
@@ -250,7 +291,7 @@ public class Miner extends RobotPlayer {
             if (rc.canSenseLocation(knownRefineries.get(i))) {
                	MapLocation loc = knownRefineries.get(i);
                	RobotInfo robot = rc.senseRobotAtLocation(loc);
-               	if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.REFINERY) {
+               	if (loc != hqLoc && (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.REFINERY)) {
                		knownRefineries.remove(i);
                		knownRefineriesWithSoup.remove(loc);
                		// send message proclaiming the death
@@ -280,16 +321,18 @@ public class Miner extends RobotPlayer {
         }
     }
 
-    public static boolean tryBuildDesignSchool() throws GameActionException {
+    public static boolean tryBuildDesignSchool(boolean ignoreNumber) throws GameActionException {
         // Currently, near (but >= distance 9) to the HQ will build a design school
-        if (knownDesignSchools.size() == 0) {
+        if (knownDesignSchools.size() == 0 || ignoreNumber) {
             if (hqLoc != null && rc.getLocation().distanceSquaredTo(hqLoc) <= 40) {
                 // Double check there are no nearby design schools
-                RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
-                for (RobotInfo robot : robots) {
-                    if (robot.type == RobotType.DESIGN_SCHOOL) {
-                        knownDesignSchools.add(robot.location);      
-                        return false;
+                if (!ignoreNumber) {
+                    RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
+                    for (RobotInfo robot : robots) {
+                        if (robot.type == RobotType.DESIGN_SCHOOL) {
+                            knownDesignSchools.add(robot.location);      
+                            return false;
+                        }
                     }
                 }
 

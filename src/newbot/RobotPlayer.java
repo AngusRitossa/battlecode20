@@ -59,7 +59,6 @@ public strictfp class RobotPlayer {
                 // Here, we've separated the controls into a different method for each RobotType.
                 // You can add the missing ones or rewrite this into your own control structure.
                 System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
-
                 switch (rc.getType()) {
                     case HQ:
                         HQ.runHQ();
@@ -165,7 +164,7 @@ public strictfp class RobotPlayer {
             // Don't reserve in early game if enemy is attacking
             return 0;
         } else {
-            return Math.min(250, rc.getRoundNum());
+            return Math.min(500, rc.getRoundNum());
         }
     }
 
@@ -389,13 +388,14 @@ public strictfp class RobotPlayer {
             k += 666;
         }
         k %= 42069;
-
+        System.out.println("k and message[6] " + k + " " + message[6] + ": " + message[0]);
         return k == message[6];
     }
 
     public static int currBlock = 1;
     public static void readBlockchain(int bytecodeLimit) throws GameActionException {
         while (currBlock < roundNum && Clock.getBytecodesLeft() > bytecodeLimit) {
+            System.out.println("Reading block");
             Transaction[] transactions = rc.getBlock(currBlock);
             for (Transaction transaction : transactions) {
                 int[] message = transaction.getMessage();
@@ -409,6 +409,7 @@ public strictfp class RobotPlayer {
     }
 
     public static void interpretBlockchain(int[] message, int cost) throws GameActionException {
+        System.out.println("interpreting message");
         if (message[0] == MESSAGE_TYPE_HQ_LOC) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
@@ -421,19 +422,32 @@ public strictfp class RobotPlayer {
                 int x = message[1] / MAX_MAP_SIZE;
                 int y = message[1] % MAX_MAP_SIZE;
                 MapLocation loc = new MapLocation(x, y);
+                System.out.println("new refinery via blockchain");
                 knownRefineries.add(loc);
                 knownRefineriesWithSoup.add(loc);
             }
         } else if (message[0] == MESSAGE_TYPE_DESIGN_SCHOOL_LOC) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new design school via blockchain");
             MapLocation loc = new MapLocation(x, y);
             knownDesignSchools.add(loc);
         } else if (message[0] == MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("design school is dead via blockchain");
             MapLocation loc = new MapLocation(x, y);
             knownDesignSchools.remove(loc);
+        }
+        else if (message[0] == MESSAGE_TYPE_REFINERY_IS_DEAD) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            MapLocation loc = new MapLocation(x, y);
+            knownRefineries.remove(loc);
+            knownRefineriesWithSoup.remove(loc);
+            System.out.println("refinery is dead via blockchain");
+        } else {
+            System.out.println("unknown message (this is probably bad)");
         }
     }
 
@@ -457,17 +471,15 @@ public strictfp class RobotPlayer {
     // TODO: Maybe clean up file stuff so that lower turtle stuff isn't split between multiple files
     public static final int[] turtleDigOffsetX    = { -2, 2, 0, 0 };
     public static final int[] turtleDigOffsetY    = { 0, 0, -2, 2 };
-    public static final int lowerTurtleHeight = 12;
+    public static final int lowerTurtleHeight = 15;
     public static boolean canBeDugForLowerTurtle(MapLocation loc) throws GameActionException {
         // Returns whether this square in the larger turtle can be dug from
         // Should be the case that every square has such a square adj to it
         if (hqLoc == null || loc == hqLoc) {
             return false;
         }
-        for (int i = 0; i < turtleDigOffsetX.length; i++) {
-            if (loc.x == hqLoc.x+turtleDigOffsetX[i] && loc.y == hqLoc.y+turtleDigOffsetY[i]) {
-                return true;
-            }
+        if (loc.distanceSquaredTo(hqLoc) == 4) {
+            return true;
         }
         return (loc.x - hqLoc.x)%3 == 0 && (loc.y - hqLoc.y)%3 == 0;
     }
