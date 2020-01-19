@@ -32,11 +32,13 @@ public strictfp class RobotPlayer {
     public static int startRoundNum;
     public static int roundNum;
     public static MapLocation hqLoc = null; // Location of HQ.
+    public static MapLocation enemyHqLoc = null;
     public static ArrayList<MapLocation> knownRefineries = new ArrayList<MapLocation>(); // includes HQ
     public static ArrayList<MapLocation> knownRefineriesWithSoup = new ArrayList<MapLocation>(); // that that have soup near them 
     public static ArrayList<MapLocation> unreachableRefineries = new ArrayList<MapLocation>(); 
     public static ArrayList<MapLocation> knownDesignSchools = new ArrayList<MapLocation>();
     public static ArrayList<MapLocation> knownFulfillmentCenters = new ArrayList<MapLocation>();
+    public static ArrayList<MapLocation> possibleEnemyHQLocs = new ArrayList<MapLocation>();
 
     public static final int startTurtlingHQRound = 400;
     /**
@@ -161,6 +163,9 @@ public strictfp class RobotPlayer {
     public static final int SOUP_RESERVE_START = 100;
     public static int soupReserve() {
         // Current formula is kinda arbitrary
+        if (roundNum > water_level_round[lowerTurtleHeight]-250) {
+            return 0;
+        }
         if (roundNum < SOUP_RESERVE_START) {
             // Don't reserve in early game if enemy is attacking
             return 0;
@@ -352,6 +357,7 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_LOC = 4;
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD = 5;
     public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_LOC = 6;
+    public static final int MESSAGE_TYPE_ENEMY_HQ_LOC = 7;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -422,6 +428,16 @@ public strictfp class RobotPlayer {
             hqLoc = new MapLocation(x, y);
             knownRefineries.add(hqLoc);
             knownRefineriesWithSoup.add(hqLoc);
+
+            // store possible enemy hq positions
+            if (rc.getMapWidth() - 1 - x != x) {
+                possibleEnemyHQLocs.add(new MapLocation(rc.getMapWidth() - 1 - x, y));
+            }
+            if (rc.getMapHeight() - 1 - y != y) {
+                possibleEnemyHQLocs.add(new MapLocation(x, rc.getMapHeight() - 1 - y));
+            }
+            possibleEnemyHQLocs.add(new MapLocation(rc.getMapWidth() - 1 - x, rc.getMapHeight() - 1 - y));
+
             System.out.println("Our HQ location: " + x + " " + y);
         } else if (message[0] == MESSAGE_TYPE_REFINERY_LOC) {
             if (rc.getType() == RobotType.MINER) {
@@ -458,6 +474,13 @@ public strictfp class RobotPlayer {
             System.out.println("new fulfillment center via blockchain");
             MapLocation loc = new MapLocation(x, y);
             knownFulfillmentCenters.add(loc);
+        } else if (message[0] == MESSAGE_TYPE_ENEMY_HQ_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("enemy location via blockchain");
+            possibleEnemyHQLocs.clear();
+            possibleEnemyHQLocs.add(new MapLocation(x, y));
+            enemyHqLoc = new MapLocation(x, y);
         } else {
             System.out.println("unknown message (this is probably bad)");
         }
@@ -494,5 +517,41 @@ public strictfp class RobotPlayer {
             return true;
         }
         return (loc.x - hqLoc.x)%3 == 0 && (loc.y - hqLoc.y)%3 == 0;
+    }
+
+    public static void checkEnemyHQLocs() throws GameActionException {
+        if (possibleEnemyHQLocs.size() > 1) {
+            for (MapLocation loc : possibleEnemyHQLocs) {
+                if (rc.canSenseLocation(loc)) {
+                    RobotInfo robot = rc.senseRobotAtLocation(loc);
+                    if (robot != null && robot.team != rc.getTeam() && robot.type == RobotType.HQ) {
+
+                        possibleEnemyHQLocs.clear();
+                        possibleEnemyHQLocs.add(loc);
+                        enemyHqLoc = loc;
+                        int locToSend = enemyHqLoc.x*MAX_MAP_SIZE + enemyHqLoc.y;
+                        int message[] = new int[7];
+                        message[0] = MESSAGE_TYPE_ENEMY_HQ_LOC;
+                        message[1] = locToSend;
+                        sendBlockchain(message, 1);
+                        return;
+                    } else {
+                        possibleEnemyHQLocs.remove(loc);
+                        if (possibleEnemyHQLocs.size() == 1) {
+                            enemyHqLoc = possibleEnemyHQLocs.get(0);
+                            int locToSend = enemyHqLoc.x*MAX_MAP_SIZE + enemyHqLoc.y;
+                            int message[] = new int[7];
+                            message[0] = MESSAGE_TYPE_ENEMY_HQ_LOC;
+                            message[1] = locToSend;
+                            sendBlockchain(message, 1);
+                            return;
+                        } else {
+                            checkEnemyHQLocs();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
     }
 }

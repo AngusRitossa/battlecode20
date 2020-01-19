@@ -10,6 +10,7 @@ public class Landscaper extends RobotPlayer {
     }
     public static void doAction() throws GameActionException {
         updateAdjHQSquares();
+        checkEnemyHQLocs();
         if (!rc.isReady()) {
             return;
         }

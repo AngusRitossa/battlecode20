@@ -12,8 +12,10 @@ public class DeliveryDrone extends RobotPlayer {
     }
     public static int hangAroundHQ = -1;
     public static int hangAroundDistanceFromHQ = 75;
+    public static final int swarmRound = 2100;
     public static RobotInfo unitCarrying = null; // ensure this is updates when we pick up/drop a unit
     public static void doAction() throws GameActionException {
+        checkEnemyHQLocs();
     	if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
             hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
@@ -22,7 +24,7 @@ public class DeliveryDrone extends RobotPlayer {
                 hangAroundHQ = 1;
             }
         }
-        if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]+50) {
+        if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]+50 && rc.getRoundNum() < swarmRound) {
         	if (hangAroundHQ == 0) {
         		hangAroundHQ = 1;
         	}
@@ -51,12 +53,18 @@ public class DeliveryDrone extends RobotPlayer {
         	if (tryPickUpUnit(hangAroundHQ == 1 ? hangAroundDistanceFromHQ : 99999)) {
         		return;
         	}
+        	if (rc.getRoundNum() > swarmRound) {
+        		hangAroundHQ = 0;
+        		if (swarmEnemyHQ()) {
+        			return;
+        		}
+        	}
         	if (hangAroundHQ == 1 && rc.getLocation().distanceSquaredTo(hqLoc) > hangAroundDistanceFromHQ) {
         		if (deliveryDroneTryMoveTowards(hqLoc)) {
         			return;
         		}
         	}
-        	if (tryMoveIntoTurtleGap()) {
+        	if (rc.getRoundNum() > 800 && tryMoveIntoTurtleGap()) {
         		return;
         	}
         	if (deliveryDroneTryMoveRandomly()) {
@@ -74,7 +82,7 @@ public class DeliveryDrone extends RobotPlayer {
     	RobotInfo robots[] = rc.senseNearbyRobots();
     	RobotInfo bestRobot = null;
     	for (RobotInfo robot: robots) {
-    		if (robot.team == rc.getTeam() && robot.type == RobotType.MINER) {
+    		if (robot.team == rc.getTeam() && robot.type == RobotType.MINER && rc.getRoundNum() > startTurtlingHQRound) {
     			// if our miner is not on the turtle: rescue it :)
     			if (rc.canSenseLocation(robot.getLocation()) && rc.senseElevation(robot.getLocation()) < lowerTurtleHeight) {
     				if (bestRobot != null && bestRobot.team == rc.getTeam()) {
@@ -183,9 +191,15 @@ public class DeliveryDrone extends RobotPlayer {
     }
 
     public static void findAdjSquaresNearNetGuns(boolean[] dangerousDir) throws GameActionException {
+        if (rc.getRoundNum() > swarmRound) {
+            // yolo
+            return;
+
+        }
     	// dangerous dir must be an array of size 8
     	// if arr[i] is true, that means directions[i] is in range of a net gun
         ArrayList<MapLocation> nearbyNetGuns = new ArrayList<MapLocation>();
+        if (enemyHqLoc != null) nearbyNetGuns.add(enemyHqLoc);
         RobotInfo robots[] = rc.senseNearbyRobots(9999, rc.getTeam().opponent());
         for (RobotInfo robot : robots) {
         	if (robot.type == RobotType.NET_GUN || robot.type == RobotType.HQ) {
@@ -313,5 +327,17 @@ public class DeliveryDrone extends RobotPlayer {
         }
         System.out.println("Moving randomly towards: " + randomSquareMovingTowards.x + " " + randomSquareMovingTowards.y);
         return deliveryDroneTryMoveTowards(randomSquareMovingTowards);
+    }
+
+    public static boolean swarmEnemyHQ() throws GameActionException {
+    	if (enemyHqLoc == null && possibleEnemyHQLocs.size() == 0) {
+    		return false;
+    	}
+        if (enemyHqLoc == null) {
+            deliveryDroneTryMoveTowards(possibleEnemyHQLocs.get(0));
+        } else {
+            deliveryDroneTryMoveTowards(enemyHqLoc);
+        }   
+    	return true;
     }
 }

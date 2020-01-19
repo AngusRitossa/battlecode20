@@ -20,6 +20,9 @@ public class FulfillmentCenter extends RobotPlayer {
     }
 
     public static int numberOfDronesWanted() {
+        if (rc.getRoundNum() < startTurtlingHQRound) {
+            return 2;
+        }
         if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]-250) {
             return 99999;
         }
@@ -33,7 +36,7 @@ public class FulfillmentCenter extends RobotPlayer {
     		return false;
     	}
     	for (Direction dir : directions) {
-            if (tryBuildInDir(RobotType.DELIVERY_DRONE, dir, false)) {
+            if (tryBuildInDir(RobotType.DELIVERY_DRONE, dir, dronesBuilt == 0)) {
                 dronesBuilt++;
                 System.out.println("Building drone " + dronesBuilt);
                 return true;

@@ -43,6 +43,9 @@ public class Miner extends RobotPlayer {
         if (tryBuildBuilding(false, RobotType.DESIGN_SCHOOL)) {
             return;
         }
+        if (tryBuildBuilding(false, RobotType.FULFILLMENT_CENTER)) {
+            return;
+        }
         if (tryMineSoup()) {
         	return;
         }
@@ -67,7 +70,7 @@ public class Miner extends RobotPlayer {
         /*if (rc.getRoundNum() < 800) {
             return 2;
         }*/
-        return 2;
+        return 3;
     }
 
     public static int vaporatorsBuilt = 0; // we build a vaporator before anything else, bc money
@@ -392,17 +395,25 @@ public class Miner extends RobotPlayer {
     }
 
     public static boolean tryBuildBuilding(boolean isOnTurtle, RobotType buildingType) throws GameActionException {
-        // Currently, near (but >= distance 9) to the HQ will build a design school
-        // Building type should be desi
-        if (knownDesignSchools.size() == 0 || isOnTurtle) {
+        int numberOfBuildings = 0;
+        if (buildingType == RobotType.DESIGN_SCHOOL) {
+            numberOfBuildings = knownDesignSchools.size();
+        } else if (buildingType == RobotType.FULFILLMENT_CENTER) {
+            numberOfBuildings = knownFulfillmentCenters.size();
+        }
+        if (numberOfBuildings == 0 || isOnTurtle) {
             if (hqLoc != null && rc.getLocation().distanceSquaredTo(hqLoc) <= 40) {
-                // Double check there are no nearby design schools
-                if (!isOnTurtle && buildingType == RobotType.DESIGN_SCHOOL) {
+                // Double check there are no buildings (if not on turtle)
+                if (!isOnTurtle) {
                     RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
                     for (RobotInfo robot : robots) {
                         if (robot.type == buildingType) {
-                            knownDesignSchools.add(robot.location);      
-                            return false;
+                            if (buildingType == RobotType.REFINERY) {
+                                knownDesignSchools.add(robot.location);      
+                                return false;
+                            } else if (buildingType == RobotType.FULFILLMENT_CENTER) {
+                                knownFulfillmentCenters.add(robot.location);
+                            }
                         }
                     }
                 }
