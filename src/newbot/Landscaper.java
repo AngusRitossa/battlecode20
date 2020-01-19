@@ -8,14 +8,12 @@ public class Landscaper extends RobotPlayer {
         doAction();
         readBlockchain(2000);
     }
-
     public static void doAction() throws GameActionException {
         updateAdjHQSquares();
         if (!rc.isReady()) {
             return;
         }
         if (lastRoundBuiltTurtle == 9999) {
-            System.out.println("I am here yay");
             lastRoundBuiltTurtle = rc.getRoundNum();
         }
         if (tryDefendBuilding()) {
@@ -99,6 +97,7 @@ public class Landscaper extends RobotPlayer {
         return false;
     }
 
+    public static int firstTurnMovingTowardHQLoc = 9999;
     public static boolean tryFormHQTurtle() throws GameActionException {
         if (hqLoc == null) {
             return false;
@@ -116,8 +115,14 @@ public class Landscaper extends RobotPlayer {
             return false;
         }
         System.out.println("Trying to move towards hq loc");
-        tryMoveTowards(hqLoc);
-        return true;
+        if (firstTurnMovingTowardHQLoc == 9999) {
+            firstTurnMovingTowardHQLoc = rc.getRoundNum();
+        }
+        if (rc.getRoundNum() > firstTurnMovingTowardHQLoc+30) {
+            System.out.println("gave up moving towards hq loc");
+            return false;
+        }
+        return tryMoveTowards(hqLoc);
     }
 
     public static boolean tryMakeTurtleAround(MapLocation turtleLoc) throws GameActionException {
@@ -220,6 +225,9 @@ public class Landscaper extends RobotPlayer {
     public static int lastRoundBuiltTurtle = 9999; // If a landscaper is unable to move to the square it wants to raise it can basically say fuck it and just raises the nearest square it can
     public static int lastRoundGaveUpBuildingTurtleProperly = -999; // If a landscaper is unable to move to the square it wants to raise it can basically say fuck it and just raises the nearest square it can
     public static boolean tryMakeLowerTurtle() throws GameActionException {
+        if (canBeDugForLowerTurtle(rc.getLocation())) {
+            return false; // we really don't want to trap ourselves
+        }
         if (rc.getDirtCarrying() == 0) {
             // Dig for the lower turtle
             for (Direction dir : directions) {
@@ -239,6 +247,10 @@ public class Landscaper extends RobotPlayer {
                 // fuck it, just save ourself
                 bestLoc = rc.getLocation();
             } else {
+                if (tryHelpMinerJoinTurtle()) {
+                    return true;
+                }
+
                 for (int i = 0; i < offsetDist.length; i++) {
                     if (offsetDist[i] > sensorRadius) {
                         break;
@@ -276,6 +288,24 @@ public class Landscaper extends RobotPlayer {
                     return true;
                 }
             } 
+        }
+        return false;
+    }
+
+    public static boolean tryHelpMinerJoinTurtle() throws GameActionException {
+        for (Direction dir : directions) {
+            MapLocation loc = rc.getLocation().add(dir);
+            if (rc.canSenseLocation(loc)) {
+                if (rc.senseElevation(loc) < lowerTurtleHeight) {
+                    // check if a miner is on here
+                    RobotInfo robot = rc.senseRobotAtLocation(loc);
+                    if (robot != null && robot.type == RobotType.MINER && robot.team == rc.getTeam()) {
+                        System.out.println("helping miner join turtle");
+                        rc.depositDirt(dir);
+                        return true;
+                    }
+                }
+            }
         }
         return false;
     }

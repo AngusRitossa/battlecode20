@@ -323,6 +323,11 @@ public strictfp class RobotPlayer {
     public static int manhattanDistance(MapLocation a, MapLocation b) {
         return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     }
+    public static int maxDistance(MapLocation a, MapLocation b) {
+        int dy = Math.abs(a.y - b.y);
+        int dx = Math.abs(a.x - b.x);
+        return Math.max(dy, dx);
+    }
 
 
     public static void findHQ() throws GameActionException {
@@ -397,7 +402,6 @@ public strictfp class RobotPlayer {
     public static int currBlock = 1;
     public static void readBlockchain(int bytecodeLimit) throws GameActionException {
         while (currBlock < roundNum && Clock.getBytecodesLeft() > bytecodeLimit) {
-            System.out.println("Reading block");
             Transaction[] transactions = rc.getBlock(currBlock);
             for (Transaction transaction : transactions) {
                 int[] message = transaction.getMessage();
@@ -467,7 +471,7 @@ public strictfp class RobotPlayer {
         // Picks a random square on the board and moves towards it
         if (randomSquareMovingTowards == null || rc.getRoundNum() - turnStartedLastMovement >= 50 || rc.getLocation().distanceSquaredTo(randomSquareMovingTowards) < 20) {
             int x = (int) (Math.random() * rc.getMapWidth());
-            int y = (int) (Math.random() * rc.getMapWidth());
+            int y = (int) (Math.random() * rc.getMapHeight());
             randomSquareMovingTowards = new MapLocation(x, y);
             turnStartedLastMovement = rc.getRoundNum();
         }

@@ -11,5 +11,8 @@ public class NetGun extends RobotPlayer {
         if (!rc.isReady()) {
             return;
         }
+        if (tryShootUnit()) {
+            return;
+        }
     }
 }

@@ -33,7 +33,7 @@ public class DesignSchool extends RobotPlayer {
     }
     public static int numberOfLandscapersWanted() {
         if (isOnTurtle == 0) {
-            return 12;
+            return 4 + rc.getRoundNum()/50;
         } else {
             return Math.min(10, rc.getRoundNum()/100);
         }

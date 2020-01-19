@@ -20,7 +20,10 @@ public class FulfillmentCenter extends RobotPlayer {
     }
 
     public static int numberOfDronesWanted() {
-        return Math.min(10, rc.getRoundNum()/100);
+        if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]-250) {
+            return 99999;
+        }
+        return rc.getRoundNum()/100;
     }
 
     public static int dronesBuilt = 0;

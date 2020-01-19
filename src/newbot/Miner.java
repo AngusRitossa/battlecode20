@@ -14,7 +14,7 @@ public class Miner extends RobotPlayer {
     public static void doAction() throws GameActionException {
         updateKnownRefineries();
         updateKnownDesignSchools();
-        if (hangAroundHQ == -1) {
+        if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
             hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
             hangAroundHQ %= 3;
@@ -22,10 +22,22 @@ public class Miner extends RobotPlayer {
                 hangAroundHQ = 1;
             }
         }
+        if (rc.getRoundNum() > startTurtlingHQRound && hangAroundHQ == 0 && 
+            rc.canSenseLocation(rc.getLocation()) && rc.senseElevation(rc.getLocation()) == lowerTurtleHeight) {
+            hangAroundHQ = 1;
+        }
         if (!rc.isReady()) {
             return;
         }
-        if (hangAroundHQ == 1 && rc.getRoundNum() >= startTurtlingHQRound && tryBeTurtleMiner()) {
+        if (runAwayFromDrone()) {
+            return;
+        }
+        if (hangAroundHQ == 1 && rc.getRoundNum() >= startTurtlingHQRound) {
+            if (tryBeTurtleMiner()) {
+                return;
+            }
+        }
+        if (tryMoveAwayFromHQ()) {
             return;
         }
         if (tryBuildBuilding(false, RobotType.DESIGN_SCHOOL)) {
@@ -45,7 +57,21 @@ public class Miner extends RobotPlayer {
         }
     }
 
-     public static boolean vaporatorBuilt = false; // we build a vaporator before anything else, bc money
+    public static int numberTurtleDesignSchoolsWanted() throws GameActionException {
+        /*if (rc.getRoundNum() < 800) {
+            return 3;
+        }*/
+        return 3;
+    }
+    public static int numberTurtleFulfillmentCentersWanted() throws GameActionException {
+        /*if (rc.getRoundNum() < 800) {
+            return 2;
+        }*/
+        return 2;
+    }
+
+    public static int vaporatorsBuilt = 0; // we build a vaporator before anything else, bc money
+    public static int netGunsBuilt = 0;
     public static boolean tryBeTurtleMiner() throws GameActionException {
         // If we're not on the turtle, try to get on it
         // Otherwise, build a refinery or move randomly
@@ -53,7 +79,7 @@ public class Miner extends RobotPlayer {
             return false;
         }
         // Miners who hang around on the turtle to build the necessary buildings
-        if (rc.senseElevation(rc.getLocation()) < lowerTurtleHeight) {
+        if (rc.senseElevation(rc.getLocation()) < lowerTurtleHeight-2) {
             // walk towards hq
             System.out.println("Trying to get onto turtle");
             // if we are adjacent to the turtle, on a square that will be turtled, stay
@@ -73,7 +99,7 @@ public class Miner extends RobotPlayer {
             }
             return tryMoveTowards(hqLoc);
         }
-        if (vaporatorBuilt && knownDesignSchools.size() < 3 && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
+        if (vaporatorsBuilt > 0 && knownDesignSchools.size() < numberTurtleDesignSchoolsWanted() && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
             if (tryBuildBuilding(true, RobotType.DESIGN_SCHOOL)) {
                 return true;
             } else {
@@ -87,7 +113,7 @@ public class Miner extends RobotPlayer {
                 }
             }
         }
-        if (vaporatorBuilt && knownFulfillmentCenters.size() < 2) {
+        if (vaporatorsBuilt > 0 && knownFulfillmentCenters.size() < numberTurtleFulfillmentCentersWanted()) {
         	if (tryBuildBuilding(true, RobotType.FULFILLMENT_CENTER)) {
                 return true;
             } else {
@@ -101,6 +127,11 @@ public class Miner extends RobotPlayer {
                 }
             }
         }
+        if (vaporatorsBuilt > netGunsBuilt*6) {
+            if (tryBuildNetGun()) {
+                return true;
+            }
+        }
         if (tryBuildVaporator()) {
             return true;
         }
@@ -108,11 +139,11 @@ public class Miner extends RobotPlayer {
     }
 
     public static boolean isSuitableLocationForBuilding(MapLocation loc) throws GameActionException {
-        // Currently just checks elevation == lowerTurtleHeight && does not contain an adjacent building
+        // Currently just checks elevation == lowerTurtleHeight
         if (!rc.canSenseLocation(loc)) {
             return false;
         }
-        if (rc.senseElevation(loc) != lowerTurtleHeight) {
+        if (rc.senseElevation(loc) < lowerTurtleHeight) {
             return false;
         }
         if (loc.distanceSquaredTo(hqLoc) <= 9) {
@@ -134,14 +165,38 @@ public class Miner extends RobotPlayer {
             MapLocation loc = rc.getLocation().add(dir);
             if (isSuitableLocationForBuilding(loc)) {
                 if (tryBuildInDir(RobotType.VAPORATOR, dir, true)) {
-                	vaporatorBuilt = true;
+                	vaporatorsBuilt++;
+                    System.out.println("I built a vaporator");
                     return true;
                 }
             }
         }   
         return false;
     }
+    public static boolean tryBuildNetGun() throws GameActionException {
+        // TODO: Be smart?
+        for (Direction dir : directions) {
+            MapLocation loc = rc.getLocation().add(dir);
+            if (isSuitableLocationForBuilding(loc)) {
+                if (tryBuildInDir(RobotType.NET_GUN, dir, true)) {
+                    netGunsBuilt++;
+                    System.out.println("I built a net gun");
+                    return true;
+                }
+            }
+        }   
+        return false;
+    }
+
     public static boolean tryMineSoup() throws GameActionException {
+        // mine soup at the hq first so we can move away and not crowd it
+        if (hqLoc != null && rc.getLocation().isAdjacentTo(hqLoc)) {
+            Direction dir = rc.getLocation().directionTo(hqLoc);
+            if (rc.canMineSoup(dir)) {
+                rc.mineSoup(dir);
+                return true;
+            }
+        }
     	for (Direction dir : Direction.allDirections()) {
     		if (rc.canMineSoup(dir)) {
     			rc.mineSoup(dir);
@@ -238,6 +293,7 @@ public class Miner extends RobotPlayer {
                     Direction bestDir = null;
                     for (Direction dir : directions) {
                         if (rc.canBuildRobot(RobotType.REFINERY, dir) &&
+                                (hqLoc == null || rc.adjacentLocation(dir).distanceSquaredTo(hqLoc) > 9) &&
                                	(bestDir == null || rc.senseElevation(rc.adjacentLocation(dir)) > rc.senseElevation(rc.adjacentLocation(bestDir)))) {
                             bestDir = dir;
                         }
@@ -354,15 +410,84 @@ public class Miner extends RobotPlayer {
                 System.out.println("I want to build a building! " + buildingType);
                 Direction bestDir = null;
                 for (Direction dir : directions) {
-                    if (rc.canBuildRobot(buildingType, dir) && rc.adjacentLocation(dir).distanceSquaredTo(hqLoc) >= 16 &&
-                            (bestDir == null || rc.senseElevation(rc.adjacentLocation(dir)) > rc.senseElevation(rc.adjacentLocation(bestDir))) &&
-                            (!isOnTurtle || isSuitableLocationForBuilding(rc.adjacentLocation(dir))) &&
-                            !canBeDugForLowerTurtle(rc.adjacentLocation(dir))) {
+                    MapLocation loc = rc.getLocation().add(dir);
+                    if (rc.canBuildRobot(buildingType, dir) && 
+                            (loc.distanceSquaredTo(hqLoc) >= 8) &&
+                            (bestDir == null || rc.senseElevation(loc) > rc.senseElevation(rc.adjacentLocation(bestDir))) &&
+                            (!isOnTurtle || isSuitableLocationForBuilding(loc))) {
                         bestDir = dir;
                     }
                 }
                 if (bestDir != null && tryBuildInDir(buildingType, bestDir, true)) {
                     return true;
+                } 
+            }
+        }
+        return false;
+    }
+
+    public static int disToNearestDrone(MapLocation loc, RobotInfo[] robots) throws GameActionException {
+        // returns an integer, the closest drone by maxDistance to loc, that appears in the robots array
+        int closest = 9999;
+        for (RobotInfo robot : robots) {
+            if (robot.type == RobotType.DELIVERY_DRONE) {
+                int dis = maxDistance(loc, robot.getLocation());
+                if (dis < closest) {
+                    closest = dis;
+                }
+            }
+        }
+        return closest;
+    }
+    public static boolean runAwayFromDrone() throws GameActionException {
+        // Miners are important (since its hard to produce more) and we *really* don't want to get eaten by an enemy drone
+        // So if we are close to an enemy drone, run away
+        RobotInfo[] robots = rc.senseNearbyRobots(25, rc.getTeam().opponent());
+        boolean tooCloseToEnemyDrone = disToNearestDrone(rc.getLocation(), robots) <= 3;
+        if (tooCloseToEnemyDrone) {
+            Direction bestDir = null;
+            int bestDis = -1;
+            for (Direction dir : directions) {
+                MapLocation loc = rc.getLocation().add(dir);
+                if (rc.canSenseLocation(loc)) {
+                    if (!rc.senseFlooding(loc) && rc.canMove(dir)) {
+                        int dis = disToNearestDrone(loc, robots);
+                        if (dis > bestDis) {
+                            bestDis = dis;
+                            bestDir = dir;
+                        }
+                    }
+                }
+            }
+            if (bestDir != null) {
+                if (rc.canMove(bestDir)) {
+                    System.out.println("Moving away from drone " + bestDis);
+                    rc.move(bestDir);
+                    return true;
+                } else {
+                    drawError("unable to run away even after finding appropriate direction");
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean tryMoveAwayFromHQ() throws GameActionException {
+        // if we are not at the HQ to deposit soup, and the hq does not have soup at it, move away!
+        if (rc.getSoupCarrying() == RobotType.MINER.soupLimit) {
+            return false;
+        }
+        if (hqLoc != null && rc.getLocation().isAdjacentTo(hqLoc)) {
+            for (Direction dir : directions) {
+                MapLocation loc = rc.getLocation().add(dir);
+                if (rc.canSenseLocation(loc)) {
+                    if (!rc.senseFlooding(loc)) {
+                        if (rc.canMove(dir)) {
+                            System.out.println("Moving away from HQ");
+                            rc.move(dir);
+                            return true;
+                        }
+                    }
                 }
             }
         }
