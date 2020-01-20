@@ -37,9 +37,6 @@ public class Miner extends RobotPlayer {
                 return;
             }
         }
-        if (tryMoveAwayFromHQ()) {
-            return;
-        }
         if (tryBuildBuilding(false, RobotType.DESIGN_SCHOOL)) {
             return;
         }
@@ -477,28 +474,6 @@ public class Miner extends RobotPlayer {
                     return true;
                 } else {
                     drawError("unable to run away even after finding appropriate direction");
-                }
-            }
-        }
-        return false;
-    }
-
-    public static boolean tryMoveAwayFromHQ() throws GameActionException {
-        // if we are not at the HQ to deposit soup, and the hq does not have soup at it, move away!
-        if (rc.getSoupCarrying() == RobotType.MINER.soupLimit) {
-            return false;
-        }
-        if (hqLoc != null && rc.getLocation().isAdjacentTo(hqLoc)) {
-            for (Direction dir : directions) {
-                MapLocation loc = rc.getLocation().add(dir);
-                if (rc.canSenseLocation(loc)) {
-                    if (!rc.senseFlooding(loc)) {
-                        if (rc.canMove(dir)) {
-                            System.out.println("Moving away from HQ");
-                            rc.move(dir);
-                            return true;
-                        }
-                    }
                 }
             }
         }

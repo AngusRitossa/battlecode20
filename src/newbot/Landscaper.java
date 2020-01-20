@@ -17,10 +17,7 @@ public class Landscaper extends RobotPlayer {
         if (lastRoundBuiltTurtle == 9999) {
             lastRoundBuiltTurtle = rc.getRoundNum();
         }
-        if (tryDefendBuilding()) {
-            return;
-        }
-        if (tryAttackBuilding()) {
+        if (tryAttackOrDefendBuilding()) {
             return;
         }
         if (tryFormHQTurtle()) {
@@ -35,6 +32,90 @@ public class Landscaper extends RobotPlayer {
         System.out.println("I'm not doing anything, how sad");
     }
 
+    public static boolean tryAttackOrDefendBuilding() throws GameActionException {
+    	// First, check if HQ is being buried
+        if (hqLoc != null && rc.getLocation().isAdjacentTo(hqLoc) && rc.canSenseLocation(hqLoc)) {
+            RobotInfo robot = rc.senseRobotAtLocation(hqLoc);
+            if (robot.getDirtCarrying() > 0) {
+                Direction dir = rc.getLocation().directionTo(hqLoc);
+                if (rc.canDigDirt(dir)) {
+                    System.out.println("Digging dirt off HQ");
+                    rc.digDirt(dir);
+                    return true;
+                }
+            }
+        }
+        // For all nearby buildings, find the 'most important' to attack/defend, and do that
+        // prioritises defence over attacking
+        RobotInfo bestBuilding = null;
+        int disToBestBuilding = 9999;
+
+        RobotInfo[] robots = rc.senseNearbyRobots();
+        for (RobotInfo robot : robots) {
+        	if (robot.type.isBuilding()) {
+        		int dis = rc.getLocation().distanceSquaredTo(robot.getLocation());
+        		if (robot.team == rc.getTeam()) {
+        			if (robot.getDirtCarrying() > 0) {
+        				if (bestBuilding == null || bestBuilding.team != rc.getTeam() || dis < disToBestBuilding) {
+        					bestBuilding = robot;
+        					disToBestBuilding = dis;
+        				}
+        			}
+        		} else {
+        			if ((bestBuilding == null || bestBuilding.team != rc.getTeam()) && dis < disToBestBuilding) {
+        				bestBuilding = robot;
+        				disToBestBuilding = dis;
+        			}
+        		}
+        	}
+        }
+        if (bestBuilding != null) {
+        	if (rc.getLocation().isAdjacentTo(bestBuilding.getLocation())) {
+        		if (bestBuilding.getTeam() == rc.getTeam()) {
+        			if (rc.getDirtCarrying() == RobotType.LANDSCAPER.dirtLimit) {
+        				// offload dirt
+        				for (Direction dir : directions) {
+        					MapLocation loc = rc.getLocation().add(dir);
+        					if (rc.canSenseLocation(loc)) {
+        						RobotInfo robot = rc.senseRobotAtLocation(loc);
+        						if (robot == null || !robot.type.isBuilding() || robot.team != rc.getTeam()) {
+        							if (rc.canDepositDirt(dir)) {
+        								rc.depositDirt(dir);
+        								System.out.println("depositing dirt bc we are full");
+        								return true;
+        							}
+        						}
+        					}
+        				}
+        			} else {
+        				Direction dir = rc.getLocation().directionTo(bestBuilding.getLocation());
+        				if (rc.canDigDirt(dir)) {
+        					rc.digDirt(dir);
+        					System.out.println("digging dirt off our building");
+        					return true;
+        				}
+        			}
+        		} else {
+        			// not our team
+        			if (rc.getDirtCarrying() == 0) {
+        				// dig dirt to kill the enemy
+						return tryDigDirtForTurtle();
+        			} else {
+        				Direction dir = rc.getLocation().directionTo(bestBuilding.getLocation());
+        				if (rc.canDepositDirt(dir)) {
+        					rc.depositDirt(dir);
+        					System.out.println("depositing dirt on enemy building");
+        					return true;
+        				}
+        			}
+        		} 
+        	} else { 
+    			System.out.println("moving towards building to attack or defend");
+    			return tryMoveTowards(bestBuilding.getLocation());
+        	}
+        }
+        return false;
+    }
     public static boolean tryDefendBuilding() throws GameActionException {
         // First, check if HQ is being buried
         if (hqLoc != null && rc.getLocation().isAdjacentTo(hqLoc) && rc.canSenseLocation(hqLoc)) {
@@ -107,7 +188,7 @@ public class Landscaper extends RobotPlayer {
             if (tryMakeTurtleAround(hqLoc)) {
                 return true;
             }
-            if (tryDigDirtForTurtle(hqLoc)) {
+            if (tryDigDirtForTurtle()) {
                 return true;
             }
             return false;
@@ -165,17 +246,14 @@ public class Landscaper extends RobotPlayer {
         return false;
     }
 
-    public static boolean tryDigDirtForTurtle(MapLocation turtleLoc) throws GameActionException {
+    public static boolean tryDigDirtForTurtle() throws GameActionException {
         // Dig dirt from one of 4 squares near the HQ (turtleDigOffsetX, turtleDigOffsetY)
-        for (int i = 0; i < turtleDigOffsetX.length; i++) {
-            MapLocation loc = turtleLoc.translate(turtleDigOffsetX[i], turtleDigOffsetY[i]);
-            if (rc.getLocation().isAdjacentTo(loc) && rc.onTheMap(loc)) {
-                Direction dir = rc.getLocation().directionTo(loc);
-                if (rc.canDigDirt(dir)) {
-                    rc.digDirt(dir);
-                    System.out.println("Digging dirt to form turtle");
-                    return true;
-                }
+        for (Direction dir : directions) {
+            MapLocation loc = rc.getLocation().add(dir);
+            if (canBeDugForLowerTurtle(loc) && rc.canDigDirt(dir)) {
+                System.out.println("Digging dirt");
+                rc.digDirt(dir);
+                return true;
             }
         }
         return false;
@@ -231,15 +309,7 @@ public class Landscaper extends RobotPlayer {
         }
         if (rc.getDirtCarrying() == 0) {
             // Dig for the lower turtle
-            for (Direction dir : directions) {
-                MapLocation loc = rc.getLocation().add(dir);
-                if (canBeDugForLowerTurtle(loc) && rc.canDigDirt(dir)) {
-                    System.out.println("Digging dirt to form lower turtle");
-                    rc.digDirt(dir);
-                    return true;
-                }
-            }
-            return false;
+            return tryDigDirtForTurtle();
         } else {
             // Find lowest square we can see that needs raising - raise it or walk towards it
             int sensorRadius = rc.getCurrentSensorRadiusSquared();
