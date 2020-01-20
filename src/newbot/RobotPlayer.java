@@ -643,4 +643,23 @@ public strictfp class RobotPlayer {
             }
         }
     }
+
+
+    public static boolean isGoodSquareForMinerDrop(MapLocation loc) throws GameActionException {
+        // used in delivery drones & miners
+        if (!rc.canSenseLocation(loc)) {
+            return false;
+        }
+        if (!rc.getLocation().isAdjacentTo(enemyHqLoc)) {
+            return false;
+        }
+        // should have an adjacent square we can build on
+        for (Direction dir : directions) {
+            MapLocation newLoc = loc.add(dir);
+            if (rc.canSenseLocation(newLoc) && Math.abs(rc.senseElevation(newLoc) - rc.senseElevation(loc)) <= 3) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

@@ -13,7 +13,7 @@ public class DeliveryDrone extends RobotPlayer {
     public static int hangAroundHQ = -1;
     public static int lateGamePickUpUnits = -1;
     public static int hangAroundDistanceFromHQ = 75;
-    public static final int swarmRound = 2100;
+    public static final int swarmRound = 2200;
     public static RobotInfo unitCarrying = null; // ensure this is updates when we pick up/drop a unit
     public static ArrayList<MapLocation> knownWater = new ArrayList<MapLocation>();
     public static void doAction() throws GameActionException {
@@ -29,9 +29,13 @@ public class DeliveryDrone extends RobotPlayer {
         if (lateGamePickUpUnits == -1) {
             lateGamePickUpUnits = (int) (Math.random() * 420);
             lateGamePickUpUnits += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
-            lateGamePickUpUnits %= 3;
-            if (lateGamePickUpUnits != 0) {
+            lateGamePickUpUnits %= 6;
+            if (lateGamePickUpUnits <= 3) {
+                lateGamePickUpUnits = 0;
+            } else if (lateGamePickUpUnits <= 5) {
                 lateGamePickUpUnits = 1;
+            } else {
+                lateGamePickUpUnits = 2;
             }
         }
         if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]+50 && rc.getRoundNum() < swarmRound) {
@@ -50,11 +54,17 @@ public class DeliveryDrone extends RobotPlayer {
         		}
         	} else {
                 if (unitCarrying.type == RobotType.MINER) {
-                    if (tryDropUnitOntoTurtle()) {
-                    return;
-                    }
-                    if (deliveryDroneTryMoveTowards(hqLoc)) {
-                        return;
+                    if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100) {
+                        if (tryDropMinerNextToEnemyHq()) {
+                            return;
+                        }
+                    } else {
+                        if (tryDropUnitOntoTurtle()) {
+                            return;
+                        }
+                        if (deliveryDroneTryMoveTowards(hqLoc)) {
+                            return;
+                        }
                     }
                 } else if (unitCarrying.type == RobotType.LANDSCAPER) {
                     if (tryDropLandscaperNextToEnemyHq()) {
@@ -110,19 +120,24 @@ public class DeliveryDrone extends RobotPlayer {
     				}
     			}
     		}
-            if (lateGamePickUpUnits != 1 && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER && 
-                rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100 && robot.getLocation().distanceSquaredTo(hqLoc) > 4 && 
+            if (((lateGamePickUpUnits == 1 && robot.type == RobotType.LANDSCAPER) || (lateGamePickUpUnits == 2 && robot.type == RobotType.MINER)) && 
+                robot.team == rc.getTeam() && rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100 && robot.getLocation().distanceSquaredTo(hqLoc) > 4 && 
                 (enemyHqLoc == null || robot.getLocation().distanceSquaredTo(enemyHqLoc) > 4)) {
                 // towards the end, pick up our landscapers, but not the ones defending the hq
                 if (bestRobot == null || bestRobot.getLocation().distanceSquaredTo(rc.getLocation()) > robot.getLocation().distanceSquaredTo(rc.getLocation())) {
                     bestRobot = robot;
                 }
             }
+
     		if (robot.team == rc.getTeam() || robot.type.isBuilding() || robot.type == RobotType.DELIVERY_DRONE || 
     			robot.getLocation().distanceSquaredTo(hqLoc) > distanceFromHQ ||
     			(bestRobot != null && bestRobot.team == rc.getTeam())) {
     			continue;
     		}
+            if (enemyHqLoc != null && rc.getRoundNum() > swarmRound && robot.getLocation().distanceSquaredTo(enemyHqLoc) > 15) {
+                // don't get distracted by other landscapers
+                continue;
+            }
     		if (bestRobot == null || bestRobot.type == RobotType.COW || 
     			(robot.type != RobotType.COW && bestRobot.getLocation().distanceSquaredTo(rc.getLocation()) > robot.getLocation().distanceSquaredTo(rc.getLocation()))) {
     			bestRobot = robot;
@@ -261,6 +276,30 @@ public class DeliveryDrone extends RobotPlayer {
             }
         }
         if (rc.getRoundNum() < swarmRound+20) {
+            return deliveryDroneTryMoveTowards(hqLoc);
+        } else {
+            return swarmEnemyHQ();
+        }
+    }
+    
+    public static boolean tryDropMinerNextToEnemyHq() throws GameActionException {
+        if (enemyHqLoc == null) {
+            return false;
+        } 
+        if (isGoodSquareForMinerDrop(rc.getLocation())) {
+            rc.disintegrate();
+        }
+        for (Direction dir : directions) {
+            MapLocation loc = rc.getLocation().add(dir);
+            if (rc.canSenseLocation(loc) && loc.isAdjacentTo(enemyHqLoc) && isGoodSquareForMinerDrop(loc)) {
+                if (rc.canDropUnit(dir)) {
+                    rc.dropUnit(dir);
+                    System.out.println("Dropping enemy landscaper onto hq");
+                    return true;
+                }
+            }
+        }
+        if (rc.getRoundNum() < swarmRound+10) {
             return deliveryDroneTryMoveTowards(hqLoc);
         } else {
             return swarmEnemyHQ();

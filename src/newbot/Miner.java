@@ -16,6 +16,7 @@ public class Miner extends RobotPlayer {
         updateKnownDesignSchools();
         updateKnownFulfillmentCenters();
         updateKnownNetGuns();
+        checkEnemyHQLocs();
 
         if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
@@ -31,6 +32,11 @@ public class Miner extends RobotPlayer {
         }
         if (!rc.isReady()) {
             return;
+        }
+        if (enemyHqLoc != null && rc.getLocation().isAdjacentTo(enemyHqLoc)) {
+            if (tryDoMinerNextToEnemyHq()) {
+                return;
+            }
         }
         if (tryBuildNetGunIfScared()) {
             return;
@@ -484,6 +490,26 @@ public class Miner extends RobotPlayer {
         }
         return closest;
     }
+
+    public static int closestDesignSchool(RobotInfo[] robots, MapLocation loc) throws GameActionException {
+        int closest = 9999;
+        for (RobotInfo robot : robots) {
+            if (robot.team == rc.getTeam() && (robot.type == RobotType.DESIGN_SCHOOL)) {
+                int dis = loc.distanceSquaredTo(robot.getLocation());
+                if (dis < closest) {
+                    closest = dis;
+                }
+            }
+        }
+        for (MapLocation designSchoolLoc : knownDesignSchools) {
+            int dis = loc.distanceSquaredTo(designSchoolLoc);
+            if (dis < closest) {
+                closest = dis;
+            }
+        }
+        return closest;
+    }
+
     public static boolean tryBuildNetGunIfScared() throws GameActionException {
         // if we can see an enemy drone, and there is no net gun (or hq) within r^2 9 of us
         // build a net gun
@@ -519,6 +545,36 @@ public class Miner extends RobotPlayer {
             }
         }
         return false;
+    }
+
+    public static boolean tryDoMinerNextToEnemyHq() throws GameActionException {
+        // if no net guns, build one!
+        RobotInfo[] robots = rc.senseNearbyRobots();
+        int netGunDis = closestNetGun(robots, rc.getLocation());
+        if (netGunDis > 20) {
+            System.out.println("I want to build a net gun!");
+            for (Direction dir : directions) {
+                if (rc.canBuildRobot(RobotType.NET_GUN, dir)) {
+                    rc.buildRobot(RobotType.NET_GUN, dir);
+                    return true;
+                }
+            }
+        } 
+        int designSchoolDis = closestDesignSchool(robots, rc.getLocation());
+        if (designSchoolDis > 20) {
+            System.out.println("I want to build a design school!");
+            for (Direction dir : directions) {
+                if (rc.canBuildRobot(RobotType.DESIGN_SCHOOL, dir)) {
+                    rc.buildRobot(RobotType.DESIGN_SCHOOL, dir);
+                    return true;
+                }
+            }
+        }
+        if (!isGoodSquareForMinerDrop(rc.getLocation()) || Math.min(netGunDis, designSchoolDis) < 20) {
+            System.out.println("miner job complete - killing myself");
+            rc.disintegrate();
+        }
+        return true;
     }
 
 }
