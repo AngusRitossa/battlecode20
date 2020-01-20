@@ -368,6 +368,7 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_NET_GUN_IS_DEAD = 10;
     public static final int MESSAGE_TYPE_VAPORATOR_LOC = 11;
     public static final int MESSAGE_TYPE_VAPORATOR_IS_DEAD = 12;
+    public static final int MESSAGE_TYPE_NOT_ENEMY_HQ_LOC = 13;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {

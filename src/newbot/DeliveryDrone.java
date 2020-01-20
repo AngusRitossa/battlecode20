@@ -30,9 +30,9 @@ public class DeliveryDrone extends RobotPlayer {
             lateGamePickUpUnits = (int) (Math.random() * 420);
             lateGamePickUpUnits += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
             lateGamePickUpUnits %= 6;
-            if (lateGamePickUpUnits <= 3) {
+            if (lateGamePickUpUnits <= 2) {
                 lateGamePickUpUnits = 0;
-            } else if (lateGamePickUpUnits <= 5) {
+            } else if (lateGamePickUpUnits <= 4) {
                 lateGamePickUpUnits = 1;
             } else {
                 lateGamePickUpUnits = 2;

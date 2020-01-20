@@ -169,7 +169,7 @@ public class Miner extends RobotPlayer {
         if (rc.senseElevation(loc) < lowerTurtleHeight) {
             return false;
         }
-        if (loc.distanceSquaredTo(hqLoc) <= 9) {
+        if (loc.distanceSquaredTo(hqLoc) < 8) {
             return false;
         }
         RobotInfo robot = rc.senseRobotAtLocation(loc);
