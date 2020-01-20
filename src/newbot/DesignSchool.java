@@ -32,10 +32,13 @@ public class DesignSchool extends RobotPlayer {
         }
     }
     public static int numberOfLandscapersWanted() {
+        if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100) {
+            return rc.getRoundNum()/50; 
+        }
         if (isOnTurtle == 0) {
             return 4 + rc.getRoundNum()/50;
         } else {
-            return Math.min(10, rc.getRoundNum()/100);
+            return rc.getRoundNum()/100;
         }
     }
 
