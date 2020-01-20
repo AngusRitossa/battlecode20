@@ -33,6 +33,9 @@ public class Miner extends RobotPlayer {
         if (!rc.isReady()) {
             return;
         }
+        if (tryBuildNetGunIfScared()) {
+            return;
+        }
         if (runAwayFromDrone()) {
             return;
         }
@@ -453,6 +456,30 @@ public class Miner extends RobotPlayer {
                     drawError("unable to run away even after finding appropriate direction");
                 }
             }
+        }
+        return false;
+    }
+
+    public static boolean tryBuildNetGunIfScared() throws GameActionException {
+        // if we can see an enemy drone, and there is no net gun (or hq) within r^2 9 of us
+        // build a net gun
+        RobotInfo[] robots = rc.senseNearbyRobots();
+        int closestNetGun = 9999;
+        int enemyDrones = 0;
+        for (RobotInfo robot : robots) {
+            if (robot.type == RobotType.DELIVERY_DRONE && robot.team != rc.getTeam()) {
+                enemyDrones++;
+            }
+            if (robot.team == rc.getTeam() && (robot.type == RobotType.NET_GUN || robot.type == RobotType.HQ)) {
+                int dis = rc.getLocation().distanceSquaredTo(robot.getLocation());
+                if (dis < closestNetGun) {
+                    closestNetGun = dis;
+                }
+            }
+        }
+        if (enemyDrones > 0 && closestNetGun > 9) {
+            System.out.println("trying to build defensive net gun");
+            return tryBuildNetGun();
         }
         return false;
     }
