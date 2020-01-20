@@ -143,7 +143,7 @@ public class Landscaper extends RobotPlayer {
         			// not our team
         			if (rc.getDirtCarrying() == 0) {
         				// dig dirt to kill the enemy
-						return tryDigDirtForTurtle();
+						return tryDigDirtForAttack();
         			} else {
         				Direction dir = rc.getLocation().directionTo(bestBuilding.getLocation());
         				if (rc.canDepositDirt(dir)) {
@@ -291,16 +291,32 @@ public class Landscaper extends RobotPlayer {
     }
 
     public static boolean tryDigDirtForTurtle() throws GameActionException {
-        // Dig dirt from one of 4 squares near the HQ (turtleDigOffsetX, turtleDigOffsetY)
+    	// dig dirt from an allowed location in the turtle
         for (Direction dir : directions) {
             MapLocation loc = rc.getLocation().add(dir);
             if (canBeDugForLowerTurtle(loc) && rc.canDigDirt(dir)) {
-                System.out.println("Digging dirt");
+                System.out.println("Digging dirt for turtle");
                 rc.digDirt(dir);
                 return true;
             }
         }
         return false;
+    }
+    public static boolean tryDigDirtForAttack() throws GameActionException {
+    	// dig dirt from any adjacent square, so long as it doesn't result in us saving an enemy building
+    	for (Direction dir : directions) {
+    		MapLocation loc = rc.getLocation().add(dir);
+    		if (rc.canDigDirt(dir) && rc.canSenseLocation(loc)) {
+	        	// Don't dig dirt off an enemy building!
+	        	RobotInfo robot = rc.senseRobotAtLocation(loc);
+	        	if (robot == null || robot.team == rc.getTeam() || !robot.type.isBuilding()) {
+	        		System.out.println("Digging dirt for attack");
+	            	rc.digDirt(dir);
+	            	return true;
+	        	}
+	        }
+    	}
+    	return false;
     }
 
     public static int adjHQSquaresClaimed[] = new int[8]; // stores for each square adjacent to the hq, if it has a unit on it
