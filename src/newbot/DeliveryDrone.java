@@ -40,12 +40,18 @@ public class DeliveryDrone extends RobotPlayer {
         			return;
         		}
         	} else {
-        		if (tryDropUnitOntoTurtle()) {
-        			return;
-        		}
-        		if (deliveryDroneTryMoveTowards(hqLoc)) {
-        			return;
-        		}
+                if (unitCarrying.type == RobotType.MINER) {
+                    if (tryDropUnitOntoTurtle()) {
+                    return;
+                    }
+                    if (deliveryDroneTryMoveTowards(hqLoc)) {
+                        return;
+                    }
+                } else if (unitCarrying.type == RobotType.LANDSCAPER) {
+                    if (tryDropLandscaperNextToEnemyHq()) {
+                        return;
+                    }
+                }
         	}
         	if (deliveryDroneTryMoveRandomly()) {
         		return;
@@ -95,6 +101,13 @@ public class DeliveryDrone extends RobotPlayer {
     				}
     			}
     		}
+            if (hangAroundHQ != 1 && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER && 
+                rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100 && robot.getLocation().distanceSquaredTo(hqLoc) > 4) {
+                // towards the end, pick up our landscapers, but not the ones defending the hq
+                if (bestRobot == null || bestRobot.getLocation().distanceSquaredTo(rc.getLocation()) > robot.getLocation().distanceSquaredTo(rc.getLocation())) {
+                    bestRobot = robot;
+                }
+            }
     		if (robot.team == rc.getTeam() || robot.type.isBuilding() || robot.type == RobotType.DELIVERY_DRONE || 
     			robot.getLocation().distanceSquaredTo(hqLoc) > distanceFromHQ ||
     			(bestRobot != null && bestRobot.team == rc.getTeam())) {
@@ -218,6 +231,30 @@ public class DeliveryDrone extends RobotPlayer {
     		}
     	}
     	return false;
+    }
+
+    public static boolean tryDropLandscaperNextToEnemyHq() throws GameActionException {
+        if (enemyHqLoc == null) {
+            return false;
+        } 
+        if (rc.getLocation().isAdjacentTo(enemyHqLoc)) {
+            rc.disintegrate();
+        }
+        for (Direction dir : directions) {
+            MapLocation loc = rc.getLocation().add(dir);
+            if (rc.canSenseLocation(loc) && loc.isAdjacentTo(enemyHqLoc)) {
+                if (rc.canDropUnit(dir)) {
+                    rc.dropUnit(dir);
+                    System.out.println("Dropping enemy landscaper onto hq");
+                    return true;
+                }
+            }
+        }
+        if (rc.getRoundNum() < swarmRound+20) {
+            return tryMoveIntoTurtleGap();
+        } else {
+            return swarmEnemyHQ();
+        }
     }
 
     public static void findAdjSquaresNearNetGuns(boolean[] dangerousDir) throws GameActionException {
