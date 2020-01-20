@@ -11,6 +11,7 @@ public class DeliveryDrone extends RobotPlayer {
         readBlockchain(2000);
     }
     public static int hangAroundHQ = -1;
+    public static int lateGamePickUpUnits = -1;
     public static int hangAroundDistanceFromHQ = 75;
     public static final int swarmRound = 2100;
     public static RobotInfo unitCarrying = null; // ensure this is updates when we pick up/drop a unit
@@ -23,6 +24,14 @@ public class DeliveryDrone extends RobotPlayer {
             hangAroundHQ %= 3;
             if (hangAroundHQ != 0) {
                 hangAroundHQ = 1;
+            }
+        }
+        if (lateGamePickUpUnits == -1) {
+            lateGamePickUpUnits = (int) (Math.random() * 420);
+            lateGamePickUpUnits += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
+            lateGamePickUpUnits %= 3;
+            if (lateGamePickUpUnits != 0) {
+                lateGamePickUpUnits = 1;
             }
         }
         if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]+50 && rc.getRoundNum() < swarmRound) {
@@ -57,7 +66,7 @@ public class DeliveryDrone extends RobotPlayer {
         		return;
         	}
         } else { 
-        	if (tryPickUpUnit(hangAroundHQ == 1 ? hangAroundDistanceFromHQ : 99999)) {
+        	if (tryPickUpUnit((hangAroundHQ == 1 && rc.getRoundNum() < water_level_round[lowerTurtleHeight]-250) ? hangAroundDistanceFromHQ : 99999)) {
         		return;
         	}
         	if (rc.getRoundNum() > swarmRound) {
@@ -101,7 +110,7 @@ public class DeliveryDrone extends RobotPlayer {
     				}
     			}
     		}
-            if (hangAroundHQ != 1 && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER && 
+            if (lateGamePickUpUnits != 1 && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER && 
                 rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100 && robot.getLocation().distanceSquaredTo(hqLoc) > 4 && 
                 (enemyHqLoc == null || robot.getLocation().distanceSquaredTo(enemyHqLoc) > 4)) {
                 // towards the end, pick up our landscapers, but not the ones defending the hq
@@ -252,7 +261,7 @@ public class DeliveryDrone extends RobotPlayer {
             }
         }
         if (rc.getRoundNum() < swarmRound+20) {
-            return tryMoveIntoTurtleGap();
+            return deliveryDroneTryMoveTowards(hqLoc);
         } else {
             return swarmEnemyHQ();
         }

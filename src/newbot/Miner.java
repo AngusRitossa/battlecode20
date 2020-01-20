@@ -460,6 +460,18 @@ public class Miner extends RobotPlayer {
         return false;
     }
 
+    public static int closestNetGun(RobotInfo[] robots, MapLocation loc) throws GameActionException {
+        int closest = 9999;
+        for (RobotInfo robot : robots) {
+            if (robot.team == rc.getTeam() && (robot.type == RobotType.NET_GUN || robot.type == RobotType.HQ)) {
+                int dis = loc.distanceSquaredTo(robot.getLocation());
+                if (dis < closest) {
+                    closest = dis;
+                }
+            }
+        }
+        return closest;
+    }
     public static boolean tryBuildNetGunIfScared() throws GameActionException {
         // if we can see an enemy drone, and there is no net gun (or hq) within r^2 9 of us
         // build a net gun
@@ -470,16 +482,15 @@ public class Miner extends RobotPlayer {
             if (robot.type == RobotType.DELIVERY_DRONE && robot.team != rc.getTeam()) {
                 enemyDrones++;
             }
-            if (robot.team == rc.getTeam() && (robot.type == RobotType.NET_GUN || robot.type == RobotType.HQ)) {
-                int dis = rc.getLocation().distanceSquaredTo(robot.getLocation());
-                if (dis < closestNetGun) {
-                    closestNetGun = dis;
+        }
+        if (enemyDrones > 0 && closestNetGun(robots, rc.getLocation()) > 9) {
+            System.out.println("trying to build defensive net gun");
+            for (Direction dir : directions) {
+                if (closestNetGun(robots, rc.getLocation().add(dir)) > 9 && tryBuildInDir(RobotType.NET_GUN, dir, true)) {
+                    System.out.println("built defensive net gun");
+                    return true;
                 }
             }
-        }
-        if (enemyDrones > 0 && closestNetGun > 9) {
-            System.out.println("trying to build defensive net gun");
-            return tryBuildNetGun();
         }
         return false;
     }
