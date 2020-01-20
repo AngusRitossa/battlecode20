@@ -68,13 +68,17 @@ public class Miner extends RobotPlayer {
         /*if (rc.getRoundNum() < 800) {
             return 3;
         }*/
-        return 3;
+        return 2;
     }
     public static int numberTurtleFulfillmentCentersWanted() throws GameActionException {
         /*if (rc.getRoundNum() < 800) {
             return 2;
         }*/
-        return 3;
+        if (rc.getRoundNum() < 1500) {
+            return 2;
+        } else {
+            return 3;
+        }
     }
 
     public static int vaporatorsBuilt = 0; // we build a vaporator before anything else, bc money
@@ -483,10 +487,10 @@ public class Miner extends RobotPlayer {
                 enemyDrones++;
             }
         }
-        if (enemyDrones > 0 && closestNetGun(robots, rc.getLocation()) > 9) {
+        if (enemyDrones > 0 && closestNetGun(robots, rc.getLocation()) > 10) {
             System.out.println("trying to build defensive net gun");
             for (Direction dir : directions) {
-                if (closestNetGun(robots, rc.getLocation().add(dir)) > 9 && tryBuildInDir(RobotType.NET_GUN, dir, true)) {
+                if (closestNetGun(robots, rc.getLocation().add(dir)) > 10 && tryBuildInDir(RobotType.NET_GUN, dir, true)) {
                     System.out.println("built defensive net gun");
                     return true;
                 }

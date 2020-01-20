@@ -37,8 +37,10 @@ public class DesignSchool extends RobotPlayer {
         }
         if (isOnTurtle == 0) {
             return 4 + rc.getRoundNum()/50;
-        } else {
+        } else if (rc.getRoundNum() < 1000) {
             return rc.getRoundNum()/100;
+        } else {
+            return 10 + (rc.getRoundNum()-1000)/200;   
         }
     }
 

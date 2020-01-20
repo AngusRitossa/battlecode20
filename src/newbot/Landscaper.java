@@ -58,19 +58,32 @@ public class Landscaper extends RobotPlayer {
 				System.out.println("walking to hq to protect it");
 				return tryMoveTowards(hqLoc);
 			}
-			tryAttackOrDefendBuilding(false);
+			if (tryAttackOrDefendBuilding(false)) {
+				return true;
+			}
+			if (trySaveUpDirt()) {
+				return true;
+			}
 			return true; // don't want to leave the hq
 		} else if (rc.getLocation().distanceSquaredTo(hqLoc) <= 2 && numberLandscapersAroundHq <= numberHqSquaresWeCanSense/2+1) {
 			// don't leave hq
-			tryAttackOrDefendBuilding(false);
+			if (tryAttackOrDefendBuilding(false)) {
+				return true;
+			}
+			if (trySaveUpDirt()) {
+				return true;
+			}
 			return true;
 		}
     	
     	if (tryAttackOrDefendBuilding(true)) {
         	return true;
     	}
-    	if (rc.getLocation().distanceSquaredTo(hqLoc) > 50) {
+    	if (rc.getLocation().distanceSquaredTo(hqLoc) > 35) {
     		return tryMoveTowards(hqLoc);
+    	}
+    	if (trySaveUpDirt()) {
+    		return true;
     	}
     	return false;
     }
@@ -439,5 +452,14 @@ public class Landscaper extends RobotPlayer {
             }
         }
         return false;
+    }
+
+    public static final int saveDirtLimit = 15;
+    public static boolean trySaveUpDirt() throws GameActionException {
+    	if (rc.getDirtCarrying() > 15) {
+    		return false;
+    	}
+    	System.out.println("digging dirt bc I have nothing else to do");
+    	return tryDigDirtForTurtle();
     }
 }
