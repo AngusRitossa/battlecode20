@@ -281,10 +281,14 @@ public class Landscaper extends RobotPlayer {
                 // height of this square is the lowest so far
                 // - height of adj is < 0
                 // - height of adj will be underwater in 5 turns
-                // - round is > 1000
-
+                // - round is > 1000 and it doesn't have a miner, or round > 1500 regardless of miner
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                boolean hasMiner = false; // don't raise the square if it has a miner on it
+                if (robot != null && robot.team == rc.getTeam() && robot.type == RobotType.MINER) {
+                    hasMiner = true;
+                }
                 if (rc.senseElevation(loc) < lowestElevation && 
-                    (rc.senseElevation(loc) < 0 || rc.getRoundNum() > 1000 || 
+                    (rc.senseElevation(loc) < 0 || (rc.getRoundNum() > 1000 && !hasMiner) || rc.getRoundNum() > 1500 ||
                     (rc.senseElevation(loc) < lowerTurtleHeight && rc.getRoundNum() > startTurtlingHQRound) ||
                     (rc.senseElevation(loc) <= 99 && water_level_round[rc.senseElevation(loc)] <= rc.getRoundNum()+5))) {
                     lowestElevation = rc.senseElevation(loc);

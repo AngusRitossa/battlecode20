@@ -16,7 +16,7 @@ public class Miner extends RobotPlayer {
         updateKnownDesignSchools();
         updateKnownFulfillmentCenters();
         updateKnownNetGuns();
-        
+
         if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
             hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
@@ -107,7 +107,10 @@ public class Miner extends RobotPlayer {
                 System.out.println("staying still to be lifted onto turtle");
                 return true;
             }
-            return tryMoveTowards(hqLoc);
+            if (rc.getLocation().distanceSquaredTo(hqLoc) > 8) {
+            	return tryMoveTowards(hqLoc);
+            }
+            return false; 
         }
         if (vaporatorsBuilt >= knownDesignSchools.size() && knownDesignSchools.size() < numberTurtleDesignSchoolsWanted() && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
             if (tryBuildBuilding(true, RobotType.DESIGN_SCHOOL)) {

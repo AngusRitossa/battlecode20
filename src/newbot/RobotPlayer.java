@@ -174,7 +174,7 @@ public strictfp class RobotPlayer {
             // Don't reserve in early game if enemy is attacking
             return 0;
         } else {
-            return Math.min(500, rc.getRoundNum());
+            return Math.min(500, rc.getRoundNum()/2);
         }
     }
 
