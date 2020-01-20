@@ -58,7 +58,10 @@ public strictfp class RobotPlayer {
         while (true) {
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode
             try {
-                roundNum = rc.getRoundNum();
+                /*roundNum = rc.getRoundNum();
+                if (roundNum == 2000) {
+                    return; // makes it easier to play games if they end at round 600
+                }*/
                 // Here, we've separated the controls into a different method for each RobotType.
                 // You can add the missing ones or rewrite this into your own control structure.
                 System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
@@ -357,7 +360,8 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_LOC = 4;
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD = 5;
     public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_LOC = 6;
-    public static final int MESSAGE_TYPE_ENEMY_HQ_LOC = 7;
+    public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_IS_DEAD = 7;
+    public static final int MESSAGE_TYPE_ENEMY_HQ_LOC = 8;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -401,7 +405,6 @@ public strictfp class RobotPlayer {
             k += 666;
         }
         k %= 42069;
-        System.out.println("k and message[6] " + k + " " + message[6] + ": " + message[0]);
         return k == message[6];
     }
 
@@ -460,8 +463,7 @@ public strictfp class RobotPlayer {
             System.out.println("design school is dead via blockchain");
             MapLocation loc = new MapLocation(x, y);
             knownDesignSchools.remove(loc);
-        }
-        else if (message[0] == MESSAGE_TYPE_REFINERY_IS_DEAD) {
+        } else if (message[0] == MESSAGE_TYPE_REFINERY_IS_DEAD) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
             MapLocation loc = new MapLocation(x, y);
@@ -550,6 +552,60 @@ public strictfp class RobotPlayer {
                             return;
                         }
                     }
+                }
+            }
+        }
+    }
+
+    public static void updateKnownRefineries() throws GameActionException {
+        for (int i = knownRefineries.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownRefineries.get(i))) {
+                MapLocation loc = knownRefineries.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (loc != hqLoc && (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.REFINERY)) {
+                    knownRefineries.remove(i);
+                    knownRefineriesWithSoup.remove(loc);
+                    // send message proclaiming the death
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_REFINERY_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void updateKnownDesignSchools() throws GameActionException {
+        for (int i = knownDesignSchools.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownDesignSchools.get(i))) {
+                MapLocation loc = knownDesignSchools.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.DESIGN_SCHOOL) {
+                    knownDesignSchools.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead design school");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void updateKnownFulfillmentCenters() throws GameActionException {
+        for (int i = knownFulfillmentCenters.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownFulfillmentCenters.get(i))) {
+                MapLocation loc = knownFulfillmentCenters.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.FULFILLMENT_CENTER) {
+                    knownFulfillmentCenters.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead fulfillment school");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_FULFILLMENT_CENTER_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
                 }
             }
         }

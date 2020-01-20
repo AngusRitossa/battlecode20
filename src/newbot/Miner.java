@@ -12,8 +12,12 @@ public class Miner extends RobotPlayer {
     }
     public static int hangAroundHQ = -1;
     public static void doAction() throws GameActionException {
-        updateKnownRefineries();
-        updateKnownDesignSchools();
+        if (lastBuiltBuilding != rc.getRoundNum()-1) {
+            // getting weird issue where it thinks the building is dead just after building it
+            updateKnownRefineries();
+            updateKnownDesignSchools();
+            updateKnownFulfillmentCenters();
+        }
         if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
             hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
@@ -99,7 +103,7 @@ public class Miner extends RobotPlayer {
             }
             return tryMoveTowards(hqLoc);
         }
-        if (vaporatorsBuilt > 0 && knownDesignSchools.size() < numberTurtleDesignSchoolsWanted() && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
+        if (vaporatorsBuilt >= knownDesignSchools.size() && knownDesignSchools.size() < numberTurtleDesignSchoolsWanted() && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
             if (tryBuildBuilding(true, RobotType.DESIGN_SCHOOL)) {
                 return true;
             } else {
@@ -113,7 +117,7 @@ public class Miner extends RobotPlayer {
                 }
             }
         }
-        if (vaporatorsBuilt > 0 && knownFulfillmentCenters.size() < numberTurtleFulfillmentCentersWanted()) {
+        if (vaporatorsBuilt >= knownFulfillmentCenters.size() && knownFulfillmentCenters.size() < numberTurtleFulfillmentCentersWanted()) {
         	if (tryBuildBuilding(true, RobotType.FULFILLMENT_CENTER)) {
                 return true;
             } else {
@@ -356,40 +360,9 @@ public class Miner extends RobotPlayer {
     	}
     }
 
-    public static void updateKnownRefineries() throws GameActionException {
-    	for (int i = knownRefineries.size() - 1; i >= 0; i--) {
-            if (rc.canSenseLocation(knownRefineries.get(i))) {
-               	MapLocation loc = knownRefineries.get(i);
-               	RobotInfo robot = rc.senseRobotAtLocation(loc);
-               	if (loc != hqLoc && (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.REFINERY)) {
-               		knownRefineries.remove(i);
-               		knownRefineriesWithSoup.remove(loc);
-               		// send message proclaiming the death
-               		int[] message = new int[7];
-                    message[0] = MESSAGE_TYPE_REFINERY_IS_DEAD;
-                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
-                    sendBlockchain(message, 1);
-               	}
-            }
-        }
-    }
+    
 
-    public static void updateKnownDesignSchools() throws GameActionException {
-        for (int i = knownDesignSchools.size() - 1; i >= 0; i--) {
-            if (rc.canSenseLocation(knownDesignSchools.get(i))) {
-                MapLocation loc = knownDesignSchools.get(i);
-                RobotInfo robot = rc.senseRobotAtLocation(loc);
-                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.DESIGN_SCHOOL) {
-                    knownDesignSchools.remove(i);
-                    // send message proclaiming the death
-                    int[] message = new int[7];
-                    message[0] = MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD;
-                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
-                    sendBlockchain(message, 1);
-                }
-            }
-        }
-    }
+    public static int lastBuiltBuilding;
 
     public static boolean tryBuildBuilding(boolean isOnTurtle, RobotType buildingType) throws GameActionException {
         int numberOfBuildings = 0;
@@ -407,11 +380,14 @@ public class Miner extends RobotPlayer {
                         if (robot.type == buildingType) {
                             if (buildingType == RobotType.REFINERY) {
                                 knownDesignSchools.add(robot.location);      
-                                return false;
                             } else if (buildingType == RobotType.FULFILLMENT_CENTER) {
                                 knownFulfillmentCenters.add(robot.location);
                             }
                         }
+                    }
+                    if ((buildingType == RobotType.DESIGN_SCHOOL && knownDesignSchools.size() > 0) ||
+                        (buildingType == RobotType.FULFILLMENT_CENTER && knownFulfillmentCenters.size() > 0)) {
+                        return false;
                     }
                 }
 
@@ -427,6 +403,7 @@ public class Miner extends RobotPlayer {
                     }
                 }
                 if (bestDir != null && tryBuildInDir(buildingType, bestDir, true)) {
+                    lastBuiltBuilding = rc.getRoundNum();
                     return true;
                 } 
             }

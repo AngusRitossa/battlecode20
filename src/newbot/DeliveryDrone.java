@@ -14,6 +14,7 @@ public class DeliveryDrone extends RobotPlayer {
     public static int hangAroundDistanceFromHQ = 75;
     public static final int swarmRound = 2100;
     public static RobotInfo unitCarrying = null; // ensure this is updates when we pick up/drop a unit
+    public static ArrayList<MapLocation> knownWater = new ArrayList<MapLocation>();
     public static void doAction() throws GameActionException {
         checkEnemyHQLocs();
     	if (hangAroundHQ == -1 && hqLoc != null) {
@@ -150,6 +151,32 @@ public class DeliveryDrone extends RobotPlayer {
     	return false;
     }
 
+    public static boolean tryMoveTowardsWater() throws GameActionException {
+        int sensorRadius = rc.getCurrentSensorRadiusSquared();
+        for (int i = 0; i < offsetDist.length; i++) {
+            if (offsetDist[i] > sensorRadius) {
+                break;
+            }
+            MapLocation loc = rc.getLocation().translate(offsetX[i], offsetY[i]);
+            if (rc.canSenseLocation(loc)) {
+                if (rc.senseFlooding(loc)) {
+                    System.out.println("moving towards water we can see");
+                    return deliveryDroneTryMoveTowards(loc);
+                }
+            }
+        }
+        MapLocation nearestKnownWater = null;
+        for (MapLocation loc : knownWater) {
+            if (nearestKnownWater == null || rc.getLocation().distanceSquaredTo(nearestKnownWater) > rc.getLocation().distanceSquaredTo(loc)) {
+                nearestKnownWater = loc;
+            }
+        }
+        if (nearestKnownWater != null) {
+            System.out.println("moving towards known water");
+            return deliveryDroneTryMoveTowards(nearestKnownWater);
+        }
+        return false;
+    }
     public static boolean tryDropUnitIntoWater() throws GameActionException {
     	// if we are above water, kills whatever we are carrying
     	// assumes we are carying a unit, and we wish death for said unit
@@ -160,11 +187,14 @@ public class DeliveryDrone extends RobotPlayer {
     				rc.dropUnit(dir);
     				unitCarrying = null;
     				System.out.println("Dropping unit into water");
+                    if (!knownWater.contains(loc)) {
+                        knownWater.add(loc);
+                    }
     				return true;
     			}
     		}
     	}
-    	return false;
+    	return tryMoveTowardsWater();
     }
 
     public static boolean tryDropUnitOntoTurtle() throws GameActionException {

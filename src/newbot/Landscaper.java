@@ -8,6 +8,7 @@ public class Landscaper extends RobotPlayer {
         doAction();
         readBlockchain(2000);
     }
+    public static final int landscaperBeginTurtleRound = 300;
     public static void doAction() throws GameActionException {
         updateAdjHQSquares();
         checkEnemyHQLocs();
@@ -17,14 +18,20 @@ public class Landscaper extends RobotPlayer {
         if (lastRoundBuiltTurtle == 9999) {
             lastRoundBuiltTurtle = rc.getRoundNum();
         }
-        if (tryAttackOrDefendBuilding()) {
-            return;
-        }
-        if (tryFormHQTurtle()) {
-            return;
-        }
-        if (tryMakeLowerTurtle()) {
-            return;
+        if (rc.getRoundNum() > landscaperBeginTurtleRound) {
+        	if (tryAttackOrDefendBuilding(true)) {
+            	return;
+        	}
+        	if (tryFormHQTurtle()) {
+            	return;
+	        }
+	        if (tryMakeLowerTurtle()) {
+	            return;
+	        }
+        } else {
+        	if (tryBeEarlyGameLandscaper()) {
+        		return;
+        	}
         }
         if (tryMoveRandomly()) {
             return;
@@ -32,7 +39,44 @@ public class Landscaper extends RobotPlayer {
         System.out.println("I'm not doing anything, how sad");
     }
 
-    public static boolean tryAttackOrDefendBuilding() throws GameActionException {
+    public static boolean tryBeEarlyGameLandscaper() throws GameActionException {
+    	// if hq is undefended, go to it!
+		int numberLandscapersAroundHq = 0;
+		int numberHqSquaresWeCanSense = 0;
+		for (Direction dir : directions) {
+			MapLocation loc = hqLoc.add(dir);
+			if (rc.canSenseLocation(loc)) {
+				numberHqSquaresWeCanSense++;
+				RobotInfo robot = rc.senseRobotAtLocation(loc);
+				if (robot != null && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER) {
+					numberLandscapersAroundHq++;
+				}
+			}
+		}
+		if (numberLandscapersAroundHq <= numberHqSquaresWeCanSense/2) {	
+			if (rc.getLocation().distanceSquaredTo(hqLoc) > 2) {
+				System.out.println("walking to hq to protect it");
+				return tryMoveTowards(hqLoc);
+			}
+			tryAttackOrDefendBuilding(false);
+			return true; // don't want to leave the hq
+		} else if (rc.getLocation().distanceSquaredTo(hqLoc) <= 2 && numberLandscapersAroundHq <= numberHqSquaresWeCanSense/2+1) {
+			// don't leave hq
+			tryAttackOrDefendBuilding(false);
+			return true;
+		}
+    	
+    	if (tryAttackOrDefendBuilding(true)) {
+        	return true;
+    	}
+    	if (rc.getLocation().distanceSquaredTo(hqLoc) > 50) {
+    		return tryMoveTowards(hqLoc);
+    	}
+    	return false;
+    }
+    public static boolean tryAttackOrDefendBuilding(boolean move) throws GameActionException {
+    	// move is whether or not we want to move towards a building to attack/defend
+    	// false if we are next to hq and want to keep our ground
     	// First, check if HQ is being buried
         if (hqLoc != null && rc.getLocation().isAdjacentTo(hqLoc) && rc.canSenseLocation(hqLoc)) {
             RobotInfo robot = rc.senseRobotAtLocation(hqLoc);
@@ -109,7 +153,7 @@ public class Landscaper extends RobotPlayer {
         				}
         			}
         		} 
-        	} else { 
+        	} else if (move) { 
     			System.out.println("moving towards building to attack or defend");
     			return tryMoveTowards(bestBuilding.getLocation());
         	}
@@ -337,7 +381,7 @@ public class Landscaper extends RobotPlayer {
                                 lastRoundGaveUpBuildingTurtleProperly = rc.getRoundNum();
                                 break;
                             }
-                            if (lastRoundGaveUpBuildingTurtleProperly+15 > rc.getRoundNum()) {
+                            if (lastRoundGaveUpBuildingTurtleProperly+30 > rc.getRoundNum()) {
                                 break;
                             }
                         }
