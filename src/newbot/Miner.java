@@ -8,7 +8,7 @@ public class Miner extends RobotPlayer {
     	readBlockchain(9000);
     	findHQ();
         doAction();
-        readBlockchain(1000);
+        readBlockchain(2000);
     }
     public static int hangAroundHQ = -1;
     public static void doAction() throws GameActionException {
@@ -16,6 +16,8 @@ public class Miner extends RobotPlayer {
         updateKnownDesignSchools();
         updateKnownFulfillmentCenters();
         updateKnownNetGuns();
+        updateKnownVaporators();
+        lookForNewBuildings();
         checkEnemyHQLocs();
 
         if (hangAroundHQ == -1 && hqLoc != null) {
@@ -79,7 +81,9 @@ public class Miner extends RobotPlayer {
         /*if (rc.getRoundNum() < 800) {
             return 2;
         }*/
-        if (rc.getRoundNum() < 1500) {
+        if (rc.getRoundNum() < 1200) {
+            return 1;
+        } else if (rc.getRoundNum() < 1500) {
             return 2;
         } else {
             return 3;
@@ -118,7 +122,7 @@ public class Miner extends RobotPlayer {
             }
             return false; 
         }
-        if (vaporatorsBuilt >= knownDesignSchools.size() && knownDesignSchools.size() < numberTurtleDesignSchoolsWanted() && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
+        if (knownVaporators.size() >= knownDesignSchools.size() && knownDesignSchools.size() < numberTurtleDesignSchoolsWanted() && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
             if (tryBuildBuilding(true, RobotType.DESIGN_SCHOOL)) {
                 return true;
             } else {
@@ -132,7 +136,7 @@ public class Miner extends RobotPlayer {
                 }
             }
         }
-        if (vaporatorsBuilt >= knownFulfillmentCenters.size() && knownFulfillmentCenters.size() < numberTurtleFulfillmentCentersWanted()) {
+        if (knownVaporators.size() >= knownFulfillmentCenters.size() && knownFulfillmentCenters.size() < numberTurtleFulfillmentCentersWanted()) {
         	if (tryBuildBuilding(true, RobotType.FULFILLMENT_CENTER)) {
                 return true;
             } else {
@@ -146,7 +150,7 @@ public class Miner extends RobotPlayer {
                 }
             }
         }
-        if (vaporatorsBuilt > netGunsBuilt*6) {
+        if (vaporatorsBuilt > netGunsBuilt*6 && knownVaporators.size() > 4) {
             if (tryBuildNetGun()) {
                 return true;
             }

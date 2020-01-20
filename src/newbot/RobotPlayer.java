@@ -39,6 +39,7 @@ public strictfp class RobotPlayer {
     public static ArrayList<MapLocation> knownDesignSchools = new ArrayList<MapLocation>();
     public static ArrayList<MapLocation> knownFulfillmentCenters = new ArrayList<MapLocation>();
     public static ArrayList<MapLocation> knownNetGuns = new ArrayList<MapLocation>(); // includes HQ
+    public static ArrayList<MapLocation> knownVaporators = new ArrayList<MapLocation>();
     public static ArrayList<MapLocation> possibleEnemyHQLocs = new ArrayList<MapLocation>();
 
     public static final int startTurtlingHQRound = 400;
@@ -365,6 +366,8 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_ENEMY_HQ_LOC = 8;
     public static final int MESSAGE_TYPE_NET_GUN_LOC = 9;
     public static final int MESSAGE_TYPE_NET_GUN_IS_DEAD = 10;
+    public static final int MESSAGE_TYPE_VAPORATOR_LOC = 11;
+    public static final int MESSAGE_TYPE_VAPORATOR_IS_DEAD = 12;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -459,7 +462,9 @@ public strictfp class RobotPlayer {
             int y = message[1] % MAX_MAP_SIZE;
             System.out.println("new design school via blockchain");
             MapLocation loc = new MapLocation(x, y);
-            knownDesignSchools.add(loc);
+            if (!knownDesignSchools.contains(loc)) {
+                knownDesignSchools.add(loc);
+            }
         } else if (message[0] == MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
@@ -478,7 +483,9 @@ public strictfp class RobotPlayer {
             int y = message[1] % MAX_MAP_SIZE;
             System.out.println("new fulfillment center via blockchain");
             MapLocation loc = new MapLocation(x, y);
-            knownFulfillmentCenters.add(loc);
+            if (!knownFulfillmentCenters.contains(loc)) {
+                knownFulfillmentCenters.add(loc);
+            }
         } else if (message[0] == MESSAGE_TYPE_ENEMY_HQ_LOC) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
@@ -491,13 +498,29 @@ public strictfp class RobotPlayer {
             int y = message[1] % MAX_MAP_SIZE;
             System.out.println("new net gun via blockchain");
             MapLocation loc = new MapLocation(x, y);
-            knownNetGuns.add(loc);
+            if (!knownNetGuns.contains(loc)) {
+                knownNetGuns.add(loc);
+            }
         } else if (message[0] == MESSAGE_TYPE_NET_GUN_IS_DEAD) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
             System.out.println("net gun is dead via blockchain");
             MapLocation loc = new MapLocation(x, y);
             knownNetGuns.remove(loc);
+        } else if (message[0] == MESSAGE_TYPE_VAPORATOR_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new vaporator via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            if (knownVaporators.size() > 20 || !knownVaporators.contains(loc)) {
+                knownVaporators.add(loc);
+            }
+        } else if (message[0] == MESSAGE_TYPE_VAPORATOR_IS_DEAD) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("vaporator is dead via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            knownVaporators.remove(loc);
         } else {
             System.out.println("unknown message (this is probably bad)");
         }
@@ -644,13 +667,59 @@ public strictfp class RobotPlayer {
         }
     }
 
+    public static void updateKnownVaporators() throws GameActionException {
+        if (knownVaporators.size() > 10) {
+            return; // when we have a lot, don't both maintaining, bc bytecode
+        }
+        for (int i = knownVaporators.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownVaporators.get(i))) {
+                MapLocation loc = knownVaporators.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.VAPORATOR) {
+                    knownVaporators.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead net gun");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_NET_GUN_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void lookForNewBuildings() throws GameActionException {
+        RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
+        for (RobotInfo robot : robots) {
+            if (robot.type.isBuilding()) {
+                if (robot.type == RobotType.VAPORATOR && knownVaporators.size() < 10) {
+                    if (!knownVaporators.contains(robot.getLocation())) {
+                        knownVaporators.add(robot.getLocation());
+                    }
+                } else if (robot.type == RobotType.NET_GUN && knownNetGuns.size() < 10) {
+                    if (!knownNetGuns.contains(robot.getLocation())) {
+                        knownNetGuns.add(robot.getLocation());
+                    }
+                } else if (robot.type == RobotType.DESIGN_SCHOOL) {
+                    if (!knownDesignSchools.contains(robot.getLocation())) {
+                        knownDesignSchools.add(robot.getLocation());
+                    }
+                } else if (robot.type == RobotType.FULFILLMENT_CENTER) {
+                    if (!knownFulfillmentCenters.contains(robot.getLocation())) {
+                        knownFulfillmentCenters.add(robot.getLocation());
+                    }
+                }
+            }
+        }
+    }
+
 
     public static boolean isGoodSquareForMinerDrop(MapLocation loc) throws GameActionException {
         // used in delivery drones & miners
         if (!rc.canSenseLocation(loc)) {
             return false;
         }
-        if (!rc.getLocation().isAdjacentTo(enemyHqLoc)) {
+        if (rc.getLocation().distanceSquaredTo(enemyHqLoc) > 8) {
             return false;
         }
         // should have an adjacent square we can build on

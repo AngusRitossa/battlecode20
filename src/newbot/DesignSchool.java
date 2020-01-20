@@ -9,7 +9,7 @@ public class DesignSchool extends RobotPlayer {
     public static void runDesignSchool() throws GameActionException {
         readBlockchain(9000);
     	doAction();
-    	readBlockchain(1000);
+    	readBlockchain(2000);
     }
     public static int isOnTurtle = -1;
     public static void doAction() throws GameActionException {
