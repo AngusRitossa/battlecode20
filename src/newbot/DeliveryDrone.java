@@ -102,7 +102,8 @@ public class DeliveryDrone extends RobotPlayer {
     			}
     		}
             if (hangAroundHQ != 1 && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER && 
-                rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100 && robot.getLocation().distanceSquaredTo(hqLoc) > 4) {
+                rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100 && robot.getLocation().distanceSquaredTo(hqLoc) > 4 && 
+                (enemyHqLoc == null || robot.getLocation().distanceSquaredTo(enemyHqLoc) > 4)) {
                 // towards the end, pick up our landscapers, but not the ones defending the hq
                 if (bestRobot == null || bestRobot.getLocation().distanceSquaredTo(rc.getLocation()) > robot.getLocation().distanceSquaredTo(rc.getLocation())) {
                     bestRobot = robot;
