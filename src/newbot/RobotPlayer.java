@@ -522,6 +522,22 @@ public strictfp class RobotPlayer {
             System.out.println("vaporator is dead via blockchain");
             MapLocation loc = new MapLocation(x, y);
             knownVaporators.remove(loc);
+        } else if (message[0] == MESSAGE_TYPE_NOT_ENEMY_HQ_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("found a location that isn't the enemy hq");
+            MapLocation loc = new MapLocation(x, y);
+            possibleEnemyHQLocs.remove(loc);
+            if (possibleEnemyHQLocs.size() == 1 && enemyHqLoc == null) {
+                // found enemy hq loc, report it
+                enemyHqLoc = possibleEnemyHQLocs.get(0);
+                int locToSend = enemyHqLoc.x*MAX_MAP_SIZE + enemyHqLoc.y;
+                int messageToSend[] = new int[7];
+                messageToSend[0] = MESSAGE_TYPE_ENEMY_HQ_LOC;
+                messageToSend[1] = locToSend;
+                sendBlockchain(messageToSend, 1);
+                System.out.println("found enemy hq loc");
+            }
         } else {
             System.out.println("unknown message (this is probably bad)");
         }

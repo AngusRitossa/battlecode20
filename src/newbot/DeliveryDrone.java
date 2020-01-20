@@ -14,6 +14,7 @@ public class DeliveryDrone extends RobotPlayer {
     public static int lateGamePickUpUnits = -1;
     public static int hangAroundDistanceFromHQ = 75;
     public static final int swarmRound = 2200;
+    public static final int swarmGoAllInRound = 2500;
     public static RobotInfo unitCarrying = null; // ensure this is updates when we pick up/drop a unit
     public static ArrayList<MapLocation> knownWater = new ArrayList<MapLocation>();
     public static void doAction() throws GameActionException {
@@ -46,6 +47,12 @@ public class DeliveryDrone extends RobotPlayer {
         }
         if (!rc.isReady()) {
             return;
+        }
+        if (deliveryDroneShouldAvoidInSwarm(rc.getLocation())) {
+        	System.out.println("in banned terrority, trying to move away");
+        	if (deliveryDroneTryMoveTowards(hqLoc)) {
+        		return;
+        	}
         }
         if (rc.isCurrentlyHoldingUnit()) {
         	if (unitCarrying.team != rc.getTeam()) {
@@ -307,7 +314,7 @@ public class DeliveryDrone extends RobotPlayer {
     }
 
     public static void findAdjSquaresNearNetGuns(boolean[] dangerousDir) throws GameActionException {
-        if (rc.getRoundNum() > swarmRound) {
+        if (rc.getRoundNum() > swarmGoAllInRound) {
             // yolo
             return;
 
@@ -329,6 +336,9 @@ public class DeliveryDrone extends RobotPlayer {
         			dangerousDir[i] = true;
         			break;
         		}
+        	}
+        	if (deliveryDroneShouldAvoidInSwarm(adjLoc)) {
+        		dangerousDir[i] = true;
         	}
         }
     }
@@ -455,5 +465,24 @@ public class DeliveryDrone extends RobotPlayer {
             deliveryDroneTryMoveTowards(enemyHqLoc);
         }   
     	return true;
+    }
+
+    public static boolean deliveryDroneShouldAvoidInSwarm(MapLocation loc) throws GameActionException {
+    	// returns true if during the set up for a swarm, we shouldn't go on this square
+    	if (rc.getRoundNum() < swarmRound || rc.getRoundNum() > swarmGoAllInRound) {
+    		return false;
+    	}
+    	if (enemyHqLoc != null) {
+    		if (loc.distanceSquaredTo(enemyHqLoc) <= 25) {
+    			return true;
+    		}
+    	} else {
+    		for (MapLocation possibleLoc : possibleEnemyHQLocs) {
+    			if (loc.distanceSquaredTo(possibleLoc) <= 15) {
+    				return true;
+    			}
+    		}
+    	}
+    	return false;
     }
 }
