@@ -58,8 +58,8 @@ public strictfp class RobotPlayer {
         while (true) {
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode
             try {
-                /*roundNum = rc.getRoundNum();
-                if (roundNum == 2000) {
+                roundNum = rc.getRoundNum();
+                /*if (roundNum == 2000) {
                     return; // makes it easier to play games if they end at round 600
                 }*/
                 // Here, we've separated the controls into a different method for each RobotType.
