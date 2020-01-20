@@ -38,6 +38,7 @@ public strictfp class RobotPlayer {
     public static ArrayList<MapLocation> unreachableRefineries = new ArrayList<MapLocation>(); 
     public static ArrayList<MapLocation> knownDesignSchools = new ArrayList<MapLocation>();
     public static ArrayList<MapLocation> knownFulfillmentCenters = new ArrayList<MapLocation>();
+    public static ArrayList<MapLocation> knownNetGuns = new ArrayList<MapLocation>(); // includes HQ
     public static ArrayList<MapLocation> possibleEnemyHQLocs = new ArrayList<MapLocation>();
 
     public static final int startTurtlingHQRound = 400;
@@ -362,6 +363,8 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_LOC = 6;
     public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_IS_DEAD = 7;
     public static final int MESSAGE_TYPE_ENEMY_HQ_LOC = 8;
+    public static final int MESSAGE_TYPE_NET_GUN_LOC = 9;
+    public static final int MESSAGE_TYPE_NET_GUN_IS_DEAD = 10;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -483,6 +486,18 @@ public strictfp class RobotPlayer {
             possibleEnemyHQLocs.clear();
             possibleEnemyHQLocs.add(new MapLocation(x, y));
             enemyHqLoc = new MapLocation(x, y);
+        } else if (message[0] == MESSAGE_TYPE_NET_GUN_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new net gun via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            knownNetGuns.add(loc);
+        } else if (message[0] == MESSAGE_TYPE_NET_GUN_IS_DEAD) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("net gun is dead via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            knownNetGuns.remove(loc);
         } else {
             System.out.println("unknown message (this is probably bad)");
         }
@@ -604,6 +619,24 @@ public strictfp class RobotPlayer {
                     System.out.println("detected dead fulfillment school");
                     int[] message = new int[7];
                     message[0] = MESSAGE_TYPE_FULFILLMENT_CENTER_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void updateKnownNetGuns() throws GameActionException {
+        for (int i = knownNetGuns.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownNetGuns.get(i))) {
+                MapLocation loc = knownNetGuns.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.NET_GUN) {
+                    knownNetGuns.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead net gun");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_NET_GUN_IS_DEAD;
                     message[1] = loc.x * MAX_MAP_SIZE + loc.y;
                     sendBlockchain(message, 1);
                 }

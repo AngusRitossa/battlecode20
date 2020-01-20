@@ -12,12 +12,11 @@ public class Miner extends RobotPlayer {
     }
     public static int hangAroundHQ = -1;
     public static void doAction() throws GameActionException {
-        if (lastBuiltBuilding != rc.getRoundNum()-1) {
-            // getting weird issue where it thinks the building is dead just after building it
-            updateKnownRefineries();
-            updateKnownDesignSchools();
-            updateKnownFulfillmentCenters();
-        }
+        updateKnownRefineries();
+        updateKnownDesignSchools();
+        updateKnownFulfillmentCenters();
+        updateKnownNetGuns();
+        
         if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
             hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
@@ -474,6 +473,12 @@ public class Miner extends RobotPlayer {
                 }
             }
         }
+        for (MapLocation netGunLoc : knownNetGuns) {
+        	int dis = loc.distanceSquaredTo(netGunLoc);
+            if (dis < closest) {
+                closest = dis;
+            }
+        }
         return closest;
     }
     public static boolean tryBuildNetGunIfScared() throws GameActionException {
@@ -482,15 +487,29 @@ public class Miner extends RobotPlayer {
         RobotInfo[] robots = rc.senseNearbyRobots();
         int closestNetGun = 9999;
         int enemyDrones = 0;
+        int requiredDistanceToNearestNetGun = 10;
+        if (rc.getLocation().distanceSquaredTo(hqLoc) > 35) {
+        	requiredDistanceToNearestNetGun = 25;
+        }
+        if (rc.getLocation().distanceSquaredTo(hqLoc) > 80) {
+        	requiredDistanceToNearestNetGun = 99999;
+        }
         for (RobotInfo robot : robots) {
             if (robot.type == RobotType.DELIVERY_DRONE && robot.team != rc.getTeam()) {
                 enemyDrones++;
             }
         }
-        if (enemyDrones > 0 && closestNetGun(robots, rc.getLocation()) > 10) {
+        if (enemyDrones > 0) {
+        	requiredDistanceToNearestNetGun/=enemyDrones;
+        }
+        if (requiredDistanceToNearestNetGun < 10) {
+        	requiredDistanceToNearestNetGun = 10;
+        }
+
+        if (enemyDrones > 0 && closestNetGun(robots, rc.getLocation()) > requiredDistanceToNearestNetGun) {
             System.out.println("trying to build defensive net gun");
             for (Direction dir : directions) {
-                if (closestNetGun(robots, rc.getLocation().add(dir)) > 10 && tryBuildInDir(RobotType.NET_GUN, dir, true)) {
+                if (closestNetGun(robots, rc.getLocation().add(dir)) > requiredDistanceToNearestNetGun && tryBuildInDir(RobotType.NET_GUN, dir, true)) {
                     System.out.println("built defensive net gun");
                     return true;
                 }

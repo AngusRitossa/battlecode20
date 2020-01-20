@@ -8,11 +8,26 @@ public class NetGun extends RobotPlayer {
     }
 
     public static void doAction() throws GameActionException {
+        reportLocation();
         if (!rc.isReady()) {
             return;
         }
         if (tryShootUnit()) {
             return;
+        }
+    }
+
+    public static boolean reportedLocation = false;
+    public static void reportLocation() throws GameActionException {
+        if (reportedLocation) {
+            return;
+        }
+        int myLoc = rc.getLocation().x*MAX_MAP_SIZE + rc.getLocation().y;
+        int message[] = new int[7];
+        message[0] = MESSAGE_TYPE_NET_GUN_LOC;
+        message[1] = myLoc;
+        if (sendBlockchain(message, 1)) {
+            reportedLocation = true;
         }
     }
 }
