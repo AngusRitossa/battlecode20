@@ -46,6 +46,12 @@ public class Miner extends RobotPlayer {
         if (runAwayFromDrone()) {
             return;
         }
+        if (hangAroundHQ == 1 && knownVaporators.size() < 2 && rc.getLocation().distanceSquaredTo(hqLoc) > 20 && rc.getTeamSoup() > 500 && soupReserve() == 500) {
+        	// long statement, but basically we want a vaporator, so move towards hq to build one
+        	if (tryMoveTowards(hqLoc)) {
+        		return;
+        	}
+        }
         if (hangAroundHQ == 1 && rc.getRoundNum() >= startTurtlingHQRound) {
             if (tryBeTurtleMiner()) {
                 return;
@@ -56,6 +62,9 @@ public class Miner extends RobotPlayer {
         }
         if (tryBuildBuilding(false, RobotType.FULFILLMENT_CENTER)) {
             return;
+        }
+        if (tryBuildVaporator()) {
+        	return;
         }
         if (tryMineSoup()) {
         	return;
@@ -178,15 +187,53 @@ public class Miner extends RobotPlayer {
         }
         return (loc.x - hqLoc.x)%3 != 0 && (loc.y - hqLoc.y)%3 != 0;
     }
+    public static boolean isSuitableLocationForVaporator(MapLocation loc) throws GameActionException {
+        // considers building off turtle if near enough (15) to hq
+        if (!rc.canSenseLocation(loc)) {
+            return false;
+        }
+        if (rc.senseElevation(loc) < lowerTurtleHeight && rc.getLocation().distanceSquaredTo(hqLoc) > 20) {
+            return false;
+        }
+        if (rc.senseElevation(loc) < 50 && (rc.senseElevation(loc) < 0 || rc.senseElevation(loc) >= water_level_round.length || rc.getRoundNum()+300 > water_level_round[rc.senseElevation(loc)])) {
+        	return false;
+        }
+        if (loc.distanceSquaredTo(hqLoc) < 8) {
+            return false;
+        }
+        RobotInfo robot = rc.senseRobotAtLocation(loc);
+        if (robot != null) {
+            return false;
+        }
+        return (loc.x - hqLoc.x)%3 != 0 && (loc.y - hqLoc.y)%3 != 0;
+    }
+    public static int soupReserveForVaporator() {
+    	if (knownVaporators.size() < 15) {
+    		return 0;
+    	}
+    	if (knownVaporators.size() < 20) {
+    		return 250;
+    	}
+    	if (knownVaporators.size() < 30) {
+    		return 600;
+    	}
+    	if (knownVaporators.size() < 50) {
+    		return 1000;
+    	}
+    	return 2500;
+    }
     public static boolean tryBuildVaporator() throws GameActionException {
         // TODO: Be smart?
+        if (rc.getTeamSoup() < RobotType.VAPORATOR.cost + soupReserveForVaporator()) {
+        	return false;
+        }
         if (rc.getRoundNum()+250 > water_level_round[lowerTurtleHeight]) {
             // a vaporator won't pay itself off, so don't build
             return false;
         }
         for (Direction dir : directions) {
             MapLocation loc = rc.getLocation().add(dir);
-            if (isSuitableLocationForBuilding(loc)) {
+            if (isSuitableLocationForVaporator(loc)) {
                 if (tryBuildInDir(RobotType.VAPORATOR, dir, true)) {
                 	vaporatorsBuilt++;
                     System.out.println("I built a vaporator");
@@ -520,12 +567,15 @@ public class Miner extends RobotPlayer {
         RobotInfo[] robots = rc.senseNearbyRobots();
         int closestNetGun = 9999;
         int enemyDrones = 0;
-        int requiredDistanceToNearestNetGun = 10;
-        if (rc.getLocation().distanceSquaredTo(hqLoc) > 35) {
+        int requiredDistanceToNearestNetGun = 15;
+        if (rc.getLocation().distanceSquaredTo(hqLoc) > 25) {
         	requiredDistanceToNearestNetGun = 25;
         }
+        if (rc.getLocation().distanceSquaredTo(hqLoc) > 50) {
+        	requiredDistanceToNearestNetGun = 40;
+        }
         if (rc.getLocation().distanceSquaredTo(hqLoc) > 80) {
-        	requiredDistanceToNearestNetGun = 99999;
+        	requiredDistanceToNearestNetGun = 999999;
         }
         for (RobotInfo robot : robots) {
             if (robot.type == RobotType.DELIVERY_DRONE && robot.team != rc.getTeam()) {

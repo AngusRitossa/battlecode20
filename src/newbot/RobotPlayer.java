@@ -165,18 +165,15 @@ public strictfp class RobotPlayer {
         } else return false;
     }
 
-    public static final int SOUP_RESERVE_START = 100;
+    public static final int SOUP_RESERVE_START = 200;
+    public static final int SOUP_RESERVE_LOW = 400;
+    public static final int[] turnsForVaporators = { 100, 250, 400, 500, 600, 650, 700, 750, 800, 850, 900, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125, 1150, 1175, 1200, 1225, 1250, 1275, 1300 };
     public static int soupReserve() {
         // Current formula is kinda arbitrary
-        if (roundNum > water_level_round[lowerTurtleHeight]-250) {
-            return 0;
+        if (knownVaporators.size() < turnsForVaporators.length && rc.getRoundNum() > turnsForVaporators[knownVaporators.size()]) {
+            return 500;
         }
-        if (roundNum < SOUP_RESERVE_START) {
-            // Don't reserve in early game if enemy is attacking
-            return 0;
-        } else {
-            return Math.min(500, rc.getRoundNum()/2);
-        }
+        return 0;
     }
 
     public static boolean canAffordToBuild(RobotType unit, boolean urgent) {
@@ -563,7 +560,7 @@ public strictfp class RobotPlayer {
     // TODO: Maybe clean up file stuff so that lower turtle stuff isn't split between multiple files
     public static final int[] turtleDigOffsetX    = { -2, 2, 0, 0 };
     public static final int[] turtleDigOffsetY    = { 0, 0, -2, 2 };
-    public static final int lowerTurtleHeight = 15;
+    public static final int lowerTurtleHeight = 10;
     public static boolean canBeDugForLowerTurtle(MapLocation loc) throws GameActionException {
         // Returns whether this square in the larger turtle can be dug from
         // Should be the case that every square has such a square adj to it

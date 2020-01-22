@@ -22,7 +22,7 @@ public class Landscaper extends RobotPlayer {
         	if (tryAttackOrDefendBuilding(true)) {
             	return;
         	}
-        	if (tryFormHQTurtle()) {
+        	if (rc.getRoundNum() > 800 && tryFormHQTurtle()) {
             	return;
 	        }
 	        if (tryMakeLowerTurtle()) {
@@ -288,7 +288,7 @@ public class Landscaper extends RobotPlayer {
                     hasMiner = true;
                 }
                 if (rc.senseElevation(loc) < lowestElevation && 
-                    (rc.senseElevation(loc) < 0 || (rc.getRoundNum() > 1000 && !hasMiner) || rc.getRoundNum() > 1500 ||
+                    (rc.senseElevation(loc) < 0 || (rc.getRoundNum() > 1500 && !hasMiner) ||
                     (rc.senseElevation(loc) < lowerTurtleHeight && rc.getRoundNum() > startTurtlingHQRound) ||
                     (rc.senseElevation(loc) <= 99 && water_level_round[rc.senseElevation(loc)] <= rc.getRoundNum()+5))) {
                     lowestElevation = rc.senseElevation(loc);
@@ -368,7 +368,7 @@ public class Landscaper extends RobotPlayer {
     public static boolean shouldBeRaisedForLowerTurtle(MapLocation loc) throws GameActionException {
         // Checks that the square isn't too low (if its too low, just give up on it)
         // Important: Assumes we can sense the location
-        if (rc.senseElevation(loc) < -20 || rc.senseElevation(loc) >= lowerTurtleHeight || canBeDugForLowerTurtle(loc)) {
+        if ((rc.senseElevation(loc) < -20 && !loc.isAdjacentTo(hqLoc)) || rc.senseElevation(loc) >= lowerTurtleHeight || canBeDugForLowerTurtle(loc)) {
             return false;
         }
         RobotInfo robot = rc.senseRobotAtLocation(loc);
@@ -405,6 +405,10 @@ public class Landscaper extends RobotPlayer {
                     }
                     MapLocation loc = rc.getLocation().translate(offsetX[i], offsetY[i]);
                     if (rc.onTheMap(loc) && shouldBeRaisedForLowerTurtle(loc)) {
+                        if (loc.isAdjacentTo(hqLoc) && rc.senseElevation(loc) < 0) {
+                            bestLoc = loc;
+                            break;
+                        }
                         if (bestLoc == null || 
                             (hqLoc.distanceSquaredTo(bestLoc) > hqLoc.distanceSquaredTo(loc))) {
                             bestLoc = loc;

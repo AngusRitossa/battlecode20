@@ -12,9 +12,9 @@ public class DeliveryDrone extends RobotPlayer {
     }
     public static int hangAroundHQ = -1;
     public static int lateGamePickUpUnits = -1;
-    public static int hangAroundDistanceFromHQ = 75;
-    public static final int swarmRound = 2200;
-    public static final int swarmGoAllInRound = 2500;
+    public static int hangAroundDistanceFromHQ = 100;
+    public static final int swarmRound = 1800;
+    public static final int swarmGoAllInRound = 2050;
     public static RobotInfo unitCarrying = null; // ensure this is updates when we pick up/drop a unit
     public static ArrayList<MapLocation> knownWater = new ArrayList<MapLocation>();
     public static void doAction() throws GameActionException {
@@ -97,6 +97,9 @@ public class DeliveryDrone extends RobotPlayer {
         			return;
         		}
         	}
+            if (hangAroundHQ == 0 && swarmEnemyHQ()) {
+                return;
+            }
         	if (rc.getRoundNum() > 800 && tryMoveIntoTurtleGap()) {
         		return;
         	}
@@ -469,7 +472,7 @@ public class DeliveryDrone extends RobotPlayer {
 
     public static boolean deliveryDroneShouldAvoidInSwarm(MapLocation loc) throws GameActionException {
     	// returns true if during the set up for a swarm, we shouldn't go on this square
-    	if (rc.getRoundNum() < swarmRound || rc.getRoundNum() > swarmGoAllInRound) {
+    	if (rc.getRoundNum() > swarmGoAllInRound) {
     		return false;
     	}
     	if (enemyHqLoc != null) {
