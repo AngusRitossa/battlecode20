@@ -31,9 +31,9 @@ public class DeliveryDrone extends RobotPlayer {
             lateGamePickUpUnits = (int) (Math.random() * 420);
             lateGamePickUpUnits += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
             lateGamePickUpUnits %= 6;
-            if (lateGamePickUpUnits <= 2) {
+            if (lateGamePickUpUnits <= 1) {
                 lateGamePickUpUnits = 0;
-            } else if (lateGamePickUpUnits <= 4) {
+            } else if (lateGamePickUpUnits <= 3) {
                 lateGamePickUpUnits = 1;
             } else {
                 lateGamePickUpUnits = 2;
@@ -285,7 +285,7 @@ public class DeliveryDrone extends RobotPlayer {
                 }
             }
         }
-        if (rc.getRoundNum() < swarmRound+20) {
+        if (rc.getRoundNum() < swarmRound) {
             return deliveryDroneTryMoveTowards(hqLoc);
         } else {
             return swarmEnemyHQ();
@@ -309,7 +309,7 @@ public class DeliveryDrone extends RobotPlayer {
                 }
             }
         }
-        if (rc.getRoundNum() < swarmRound+10) {
+        if (rc.getRoundNum() < swarmRound) {
             return deliveryDroneTryMoveTowards(hqLoc);
         } else {
             return swarmEnemyHQ();
@@ -317,11 +317,6 @@ public class DeliveryDrone extends RobotPlayer {
     }
 
     public static void findAdjSquaresNearNetGuns(boolean[] dangerousDir) throws GameActionException {
-        if (rc.getRoundNum() > swarmGoAllInRound) {
-            // yolo
-            return;
-
-        }
     	// dangerous dir must be an array of size 8
     	// if arr[i] is true, that means directions[i] is in range of a net gun
         ArrayList<MapLocation> nearbyNetGuns = new ArrayList<MapLocation>();
@@ -334,12 +329,14 @@ public class DeliveryDrone extends RobotPlayer {
         }
         for (int i = 0; i < directions.length; i++) {
         	MapLocation adjLoc = rc.getLocation().add(directions[i]);
-        	for (MapLocation netGunLoc : nearbyNetGuns) {
-        		if (netGunLoc.distanceSquaredTo(adjLoc) <= GameConstants.NET_GUN_SHOOT_RADIUS_SQUARED) {
-        			dangerousDir[i] = true;
-        			break;
-        		}
-        	}
+            if (rc.getRoundNum() <= swarmGoAllInRound) {
+            	for (MapLocation netGunLoc : nearbyNetGuns) {
+            		if (netGunLoc.distanceSquaredTo(adjLoc) <= GameConstants.NET_GUN_SHOOT_RADIUS_SQUARED) {
+            			dangerousDir[i] = true;
+            			break;
+            		}
+            	}
+            }
         	if (deliveryDroneShouldAvoidInSwarm(adjLoc)) {
         		dangerousDir[i] = true;
         	}
@@ -472,7 +469,12 @@ public class DeliveryDrone extends RobotPlayer {
 
     public static boolean deliveryDroneShouldAvoidInSwarm(MapLocation loc) throws GameActionException {
     	// returns true if during the set up for a swarm, we shouldn't go on this square
-    	if (rc.getRoundNum() > swarmGoAllInRound) {
+    	if (enemyHqLoc != null) {
+            if ((loc.distanceSquaredTo(enemyHqLoc) == 1 || loc.distanceSquaredTo(enemyHqLoc) == 4) && !rc.isCurrentlyHoldingUnit()) {
+                return true;
+            }
+        }
+        if (rc.getRoundNum() > swarmGoAllInRound) {
     		return false;
     	}
     	if (enemyHqLoc != null) {

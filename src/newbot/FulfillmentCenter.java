@@ -36,6 +36,12 @@ public class FulfillmentCenter extends RobotPlayer {
         }
         return rc.getRoundNum()/100;
     }
+    public static int soupReserveForDrone() {
+        if (dronesBuilt < 50) {
+            return 0;
+        }
+        return 150;
+    }
 
     public static int dronesBuilt = 0;
     public static boolean tryBuildDrone() throws GameActionException {
@@ -43,6 +49,9 @@ public class FulfillmentCenter extends RobotPlayer {
     		// TODO: Not this
     		return false;
     	}
+        if (rc.getTeamSoup() < RobotType.DELIVERY_DRONE.cost + soupReserveForDrone()) {
+            return false;
+        }
     	for (Direction dir : directions) {
             if (tryBuildInDir(RobotType.DELIVERY_DRONE, dir, dronesBuilt == 0)) {
                 dronesBuilt++;

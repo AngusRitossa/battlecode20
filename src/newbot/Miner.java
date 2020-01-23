@@ -60,7 +60,7 @@ public class Miner extends RobotPlayer {
         if (tryBuildBuilding(false, RobotType.DESIGN_SCHOOL)) {
             return;
         }
-        if (tryBuildBuilding(false, RobotType.FULFILLMENT_CENTER)) {
+        if (rc.getRoundNum() > 150 && tryBuildBuilding(false, RobotType.FULFILLMENT_CENTER)) {
             return;
         }
         if (tryBuildVaporator()) {

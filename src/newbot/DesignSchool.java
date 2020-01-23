@@ -32,7 +32,7 @@ public class DesignSchool extends RobotPlayer {
         }
     }
     public static int numberOfLandscapersWanted() {
-        if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]-100) {
+        if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]-200) {
             return rc.getRoundNum()/50; 
         }
         if (knownVaporators.size() == 0) {

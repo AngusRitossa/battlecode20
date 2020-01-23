@@ -9,7 +9,7 @@ public class HQ extends RobotPlayer {
     public static void runHQ() throws GameActionException {
         readBlockchain(9000);
         doAction();
-        readBlockchain(1000);
+        readBlockchain(2000);
     }
 
     public static void doAction() throws GameActionException {
@@ -28,7 +28,7 @@ public class HQ extends RobotPlayer {
     public static int minersBuilt = 0;
     public static boolean tryBuildMiner() throws GameActionException {
         // TODO: Don't just build miners
-        if (minersBuilt >= 8 || minersBuilt >= rc.getRoundNum()/40 + 2) {
+        if (minersBuilt >= 10 || minersBuilt >= rc.getRoundNum()/30 + 3) {
             return false;
         }
         for (Direction dir : directions) {

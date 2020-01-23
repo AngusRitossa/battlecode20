@@ -40,46 +40,10 @@ public class Landscaper extends RobotPlayer {
     }
 
     public static boolean tryBeEarlyGameLandscaper() throws GameActionException {
-    	// if hq is undefended, go to it!
-		int numberLandscapersAroundHq = 0;
-		int numberHqSquaresWeCanSense = 0;
-		for (Direction dir : directions) {
-			MapLocation loc = hqLoc.add(dir);
-			if (rc.canSenseLocation(loc)) {
-				numberHqSquaresWeCanSense++;
-				RobotInfo robot = rc.senseRobotAtLocation(loc);
-				if (robot != null && robot.team == rc.getTeam() && robot.type == RobotType.LANDSCAPER) {
-					numberLandscapersAroundHq++;
-				}
-			}
-		}
-		if (numberLandscapersAroundHq <= numberHqSquaresWeCanSense/2) {	
-			if (rc.getLocation().distanceSquaredTo(hqLoc) > 2) {
-				System.out.println("walking to hq to protect it");
-				return tryMoveTowards(hqLoc);
-			}
-			if (tryAttackOrDefendBuilding(false)) {
-				return true;
-			}
-			if (trySaveUpDirt()) {
-				return true;
-			}
-			return true; // don't want to leave the hq
-		} else if (rc.getLocation().distanceSquaredTo(hqLoc) <= 2 && numberLandscapersAroundHq <= numberHqSquaresWeCanSense/2+1) {
-			// don't leave hq
-			if (tryAttackOrDefendBuilding(false)) {
-				return true;
-			}
-			if (trySaveUpDirt()) {
-				return true;
-			}
-			return true;
-		}
-    	
     	if (tryAttackOrDefendBuilding(true)) {
         	return true;
     	}
-    	if (rc.getLocation().distanceSquaredTo(hqLoc) > 35) {
+    	if (rc.getLocation().distanceSquaredTo(hqLoc) > 15) {
     		return tryMoveTowards(hqLoc);
     	}
     	if (trySaveUpDirt()) {
