@@ -35,7 +35,7 @@ public class Miner extends RobotPlayer {
         if (!rc.isReady()) {
             return;
         }
-        if (enemyHqLoc != null && rc.getLocation().isAdjacentTo(enemyHqLoc)) {
+        if (enemyHqLoc != null && rc.getRoundNum() > swarmGoAllInRound) {
             if (tryDoMinerNextToEnemyHq()) {
                 return;
             }
@@ -132,6 +132,7 @@ public class Miner extends RobotPlayer {
             return false; 
         }
         if (knownVaporators.size() >= knownDesignSchools.size() && knownDesignSchools.size() < numberTurtleDesignSchoolsWanted() && knownDesignSchools.size() <= knownFulfillmentCenters.size()+1) {
+            System.out.println("want to build design school on turtle");
             if (tryBuildBuilding(true, RobotType.DESIGN_SCHOOL)) {
                 return true;
             } else {
@@ -603,6 +604,9 @@ public class Miner extends RobotPlayer {
 
     public static boolean tryDoMinerNextToEnemyHq() throws GameActionException {
         // if no net guns, build one!
+        if (rc.getLocation().distanceSquaredTo(enemyHqLoc) > 9) {
+            return tryMoveTowards(enemyHqLoc);
+        }
         RobotInfo[] robots = rc.senseNearbyRobots();
         int netGunDis = closestNetGun(robots, rc.getLocation());
         if (netGunDis > 20) {

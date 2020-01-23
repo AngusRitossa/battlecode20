@@ -61,7 +61,7 @@ public class HQ extends RobotPlayer {
     public static boolean initiatedEarlySwarm = false;
     public static final int dronesRequiredForEarlySwarm = 90;
     public static void tryInitiateEarlySwarm() throws GameActionException {
-        if (rc.getRoundNum() < swarmRound-250 && totalNumberDronesBuilt >= dronesRequiredForEarlySwarm && !initiatedEarlySwarm) {
+        if (rc.getRoundNum() < swarmRound-200 && totalNumberDronesBuilt >= dronesRequiredForEarlySwarm && !initiatedEarlySwarm) {
             System.out.println("Try to initiate early swarm");
             // initiates a swarm for 100 turns time
             int message[] = new int[7];
