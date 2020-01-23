@@ -198,7 +198,10 @@ public strictfp class RobotPlayer {
     public static final int SOUP_RESERVE_LOW = 400;
     public static final int[] turnsForVaporators = { 100, 250, 400, 500, 600, 650, 700, 750, 800, 850, 900, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125, 1150, 1175, 1200, 1225, 1250, 1275, 1300 };
     public static int soupReserve() {
-        // Current formula is kinda arbitrary
+        // Forces vaporator building
+        if (rc.getRoundNum() > swarmRound) {
+            return 0;
+        }
         if (knownVaporators.size() < turnsForVaporators.length && rc.getRoundNum() > turnsForVaporators[knownVaporators.size()]) {
             return 500;
         }
