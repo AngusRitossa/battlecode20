@@ -32,8 +32,12 @@ public class HQ extends RobotPlayer {
         if (minersBuilt >= 10 || minersBuilt >= rc.getRoundNum()/30 + 3) {
             return false;
         }
+        boolean priority = false;
+        if (rc.getRoundNum() >= landscaperStartTurtleRound && minersBuilt < 6) {
+            priority = true;
+        }
         for (Direction dir : directions) {
-            if (tryBuildInDir(RobotType.MINER, dir, false)) {
+            if (tryBuildInDir(RobotType.MINER, dir, priority)) {
                 minersBuilt++;
                 return true;
             }

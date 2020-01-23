@@ -46,6 +46,7 @@ public strictfp class RobotPlayer {
     public static ArrayList<Integer> numberDronesBuiltNumbers = new ArrayList<Integer>();
 
     public static final int startTurtlingHQRound = 400;
+    public static final int landscaperStartTurtleRound = 300;
     public static final int swarmRound = 1800;
     public static final int swarmGoAllInRound = 2050;
     public static int earlySwarmRound = 999999; // modified by a message from the HQ

@@ -8,7 +8,6 @@ public class Landscaper extends RobotPlayer {
         doAction();
         readBlockchain(2000);
     }
-    public static final int landscaperBeginTurtleRound = 300;
     public static void doAction() throws GameActionException {
         updateAdjHQSquares();
         checkEnemyHQLocs();
@@ -16,9 +15,9 @@ public class Landscaper extends RobotPlayer {
             return;
         }
         if (lastRoundBuiltTurtle == 9999) {
-            lastRoundBuiltTurtle = rc.getRoundNum();
+            lastRoundBuiltTurtle = Math.max(rc.getRoundNum(), landscaperStartTurtleRound);
         }
-        if (rc.getRoundNum() > landscaperBeginTurtleRound) {
+        if (rc.getRoundNum() > landscaperStartTurtleRound) {
         	if (tryAttackOrDefendBuilding(true)) {
             	return;
         	}
@@ -46,6 +45,9 @@ public class Landscaper extends RobotPlayer {
     	if (rc.getLocation().distanceSquaredTo(hqLoc) > 15) {
     		return tryMoveTowards(hqLoc);
     	}
+        if (trySlightlyRaiseAroundHq()) {
+            return true;
+        }
     	if (trySaveUpDirt()) {
     		return true;
     	}
@@ -345,11 +347,11 @@ public class Landscaper extends RobotPlayer {
     public static int lastRoundBuiltTurtle = 9999; // If a landscaper is unable to move to the square it wants to raise it can basically say fuck it and just raises the nearest square it can
     public static int lastRoundGaveUpBuildingTurtleProperly = -999; // If a landscaper is unable to move to the square it wants to raise it can basically say fuck it and just raises the nearest square it can
     public static boolean tryMakeLowerTurtle() throws GameActionException {
-        if (canBeDugForLowerTurtle(rc.getLocation())) {
-            return false; // we really don't want to trap ourselves
-        }
         if (rc.getDirtCarrying() == 0) {
             // Dig for the lower turtle
+            if (canBeDugForLowerTurtle(rc.getLocation())) {
+                return false;
+            }
             return tryDigDirtForTurtle();
         } else {
             // Find lowest square we can see that needs raising - raise it or walk towards it
@@ -369,10 +371,6 @@ public class Landscaper extends RobotPlayer {
                     }
                     MapLocation loc = rc.getLocation().translate(offsetX[i], offsetY[i]);
                     if (rc.onTheMap(loc) && shouldBeRaisedForLowerTurtle(loc)) {
-                        if (loc.isAdjacentTo(hqLoc) && rc.senseElevation(loc) < 0) {
-                            bestLoc = loc;
-                            break;
-                        }
                         if (bestLoc == null || 
                             (hqLoc.distanceSquaredTo(bestLoc) > hqLoc.distanceSquaredTo(loc))) {
                             bestLoc = loc;
@@ -392,7 +390,7 @@ public class Landscaper extends RobotPlayer {
             if (bestLoc != null) {
                 if (rc.getLocation().isAdjacentTo(bestLoc)) {
                     Direction dir = rc.getLocation().directionTo(bestLoc);
-                    if (rc.canDepositDirt(dir)) {
+                    if (!canBeDugForLowerTurtle(rc.getLocation()) && rc.canDepositDirt(dir)) {
                         rc.depositDirt(dir);
                         lastRoundBuiltTurtle = rc.getRoundNum();
                         System.out.println("depositing dirt on lower turtle");
@@ -433,5 +431,52 @@ public class Landscaper extends RobotPlayer {
     	}
     	System.out.println("digging dirt bc I have nothing else to do");
     	return tryDigDirtForTurtle();
+    }
+    public static boolean wouldBeBlockedOff(MapLocation loc, int elevation) throws GameActionException {
+        // checks theres a square adjacent to this that isn't adj to the hq or the hq that it can reach
+        for (Direction dir : directions) {
+            MapLocation adjLoc = loc.add(dir);
+            if (rc.canSenseLocation(adjLoc)) {
+                if (!adjLoc.isAdjacentTo(hqLoc) && !adjLoc.equals(hqLoc)) {
+                    int diff = Math.abs(rc.senseElevation(adjLoc)-elevation);
+                    if (diff <= 3) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+    public static boolean trySlightlyRaiseAroundHq() throws GameActionException {
+        // for each square adj to hq, make sure its at least hqheight+1
+        if (hqLoc == null || !rc.canSenseLocation(hqLoc) || rc.getDirtCarrying() == 0) {
+            return false;
+        }
+        MapLocation bestLoc = null;
+        for (Direction dir : directions) {
+            MapLocation loc = hqLoc.add(dir);
+            if (rc.canSenseLocation(loc)) {
+                if (rc.senseElevation(loc) < rc.senseElevation(hqLoc)+2 && !wouldBeBlockedOff(loc, rc.senseElevation(loc)+1)) {
+                    if (bestLoc == null || rc.getLocation().distanceSquaredTo(bestLoc) > rc.getLocation().distanceSquaredTo(loc)) {
+                        bestLoc = loc;
+                    }
+                }
+            }
+        }
+        if (bestLoc == null) {
+            return false;
+        }
+        if (rc.getLocation().isAdjacentTo(bestLoc)) {
+            Direction dir = rc.getLocation().directionTo(bestLoc);
+            if (rc.canDepositDirt(dir)) {
+                rc.depositDirt(dir);
+                System.out.println("depositing dirt on loc adj to hq");
+                return true;
+            }
+        } else {
+            System.out.println("moving towards square adj to hq to raise by 2");
+            return tryMoveTowards(bestLoc);
+        }
+        return false;
     }
 }
