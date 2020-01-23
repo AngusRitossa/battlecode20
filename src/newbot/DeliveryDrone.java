@@ -13,10 +13,9 @@ public class DeliveryDrone extends RobotPlayer {
     public static int hangAroundHQ = -1;
     public static int lateGamePickUpUnits = -1;
     public static int hangAroundDistanceFromHQ = 100;
-    public static final int swarmRound = 1800;
-    public static final int swarmGoAllInRound = 2050;
     public static RobotInfo unitCarrying = null; // ensure this is updates when we pick up/drop a unit
     public static ArrayList<MapLocation> knownWater = new ArrayList<MapLocation>();
+    public static boolean participatingInEarlySwarm = false;
     public static void doAction() throws GameActionException {
         checkEnemyHQLocs();
     	if (hangAroundHQ == -1 && hqLoc != null) {
@@ -39,11 +38,9 @@ public class DeliveryDrone extends RobotPlayer {
                 lateGamePickUpUnits = 2;
             }
         }
-        if (rc.getRoundNum() > water_level_round[lowerTurtleHeight]+50 && rc.getRoundNum() < swarmRound) {
-        	if (hangAroundHQ == 0) {
-        		hangAroundHQ = 1;
-        	}
-        	hangAroundDistanceFromHQ = 15;
+        if (rc.getRoundNum() == earlySwarmRound && hangAroundHQ == 0 && enemyHqLoc != null && rc.getLocation().distanceSquaredTo(enemyHqLoc) <= 200) {
+            System.out.println("participating in early swarm");
+            participatingInEarlySwarm = true;
         }
         if (!rc.isReady()) {
             return;
@@ -329,7 +326,7 @@ public class DeliveryDrone extends RobotPlayer {
         }
         for (int i = 0; i < directions.length; i++) {
         	MapLocation adjLoc = rc.getLocation().add(directions[i]);
-            if (rc.getRoundNum() <= swarmGoAllInRound) {
+            if (rc.getRoundNum() <= swarmGoAllInRound && !participatingInEarlySwarm) {
             	for (MapLocation netGunLoc : nearbyNetGuns) {
             		if (netGunLoc.distanceSquaredTo(adjLoc) <= GameConstants.NET_GUN_SHOOT_RADIUS_SQUARED) {
             			dangerousDir[i] = true;
@@ -474,7 +471,7 @@ public class DeliveryDrone extends RobotPlayer {
                 return true;
             }
         }
-        if (rc.getRoundNum() > swarmGoAllInRound) {
+        if (rc.getRoundNum() > swarmGoAllInRound || participatingInEarlySwarm) {
     		return false;
     	}
     	if (enemyHqLoc != null) {

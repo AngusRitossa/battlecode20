@@ -41,8 +41,14 @@ public strictfp class RobotPlayer {
     public static ArrayList<MapLocation> knownNetGuns = new ArrayList<MapLocation>(); // includes HQ
     public static ArrayList<MapLocation> knownVaporators = new ArrayList<MapLocation>();
     public static ArrayList<MapLocation> possibleEnemyHQLocs = new ArrayList<MapLocation>();
+    public static int totalNumberDronesBuilt = 0; // total number of drones built across all fulfillment centers
+    public static ArrayList<Integer> numberDronesBuiltLocations = new ArrayList<Integer>();
+    public static ArrayList<Integer> numberDronesBuiltNumbers = new ArrayList<Integer>();
 
     public static final int startTurtlingHQRound = 400;
+    public static final int swarmRound = 1800;
+    public static final int swarmGoAllInRound = 2050;
+    public static int earlySwarmRound = 999999; // modified by a message from the HQ
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
      * If this method returns, the robot dies!
@@ -134,14 +140,36 @@ public strictfp class RobotPlayer {
     // Used by HQ and Netguns.
     // Returns whether a unit was shot.
     public static boolean tryShootUnit() throws GameActionException {
-        // TODO: prioritise which enemy drone?
+        // prioritise drones adjacent to our units
         RobotInfo[] robots = rc.senseNearbyRobots(999999, rc.getTeam().opponent());
+        RobotInfo robotWeCanShoot = null;
+
         for (RobotInfo robot : robots) {
             if (rc.canShootUnit(robot.ID)) {
-                rc.shootUnit(robot.ID);
-                rc.setIndicatorLine(rc.getLocation(), robot.location, 255, 0, 0);
-                return true;
+                robotWeCanShoot = robot;
+                boolean adjacentToOurUnit = false;
+                for (Direction dir : directions) {
+                    MapLocation loc = robot.getLocation().add(dir);
+                    if (rc.canSenseLocation(loc)) {
+                        RobotInfo adjRobot = rc.senseRobotAtLocation(loc);
+                        if (adjRobot != null && adjRobot.team == rc.getTeam() && (adjRobot.type == RobotType.LANDSCAPER || adjRobot.type == RobotType.MINER) && !robot.isCurrentlyHoldingUnit()) {
+                            adjacentToOurUnit = true;
+                        }
+                    }
+                }
+                if (adjacentToOurUnit) {
+                    System.out.println("Shooting unit adj to friendly unit");
+                    rc.shootUnit(robot.ID);
+                    rc.setIndicatorLine(rc.getLocation(), robot.location, 255, 0, 0);
+                    return true;
+                }
             }
+        }
+        if (robotWeCanShoot != null) {
+            System.out.println("Shooting unit not adj to friendly unit");
+            rc.shootUnit(robotWeCanShoot.ID);
+            rc.setIndicatorLine(rc.getLocation(), robotWeCanShoot.location, 255, 0, 0);
+            return true;
         }
         return false;
     }
@@ -366,6 +394,8 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_VAPORATOR_LOC = 11;
     public static final int MESSAGE_TYPE_VAPORATOR_IS_DEAD = 12;
     public static final int MESSAGE_TYPE_NOT_ENEMY_HQ_LOC = 13;
+    public static final int MESSAGE_TYPE_NUMER_FULFILLMENT_CENTER_DRONES_BUILT = 14;
+    public static final int MESSAGE_TYPE_DO_EARLY_SWARM = 15;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -535,6 +565,30 @@ public strictfp class RobotPlayer {
                 sendBlockchain(messageToSend, 1);
                 System.out.println("found enemy hq loc");
             }
+        } else if (message[0] == MESSAGE_TYPE_NUMER_FULFILLMENT_CENTER_DRONES_BUILT) {
+            if (rc.getType() == RobotType.HQ || rc.getType() == RobotType.FULFILLMENT_CENTER) {
+                // save bytecode by only doing this for buildings that need it
+                int loc = message[1];
+                int num = message[2];
+                int index = numberDronesBuiltLocations.lastIndexOf(loc);
+                if (index == -1) {
+                    numberDronesBuiltLocations.add(loc);
+                    numberDronesBuiltNumbers.add(0);
+                    index = numberDronesBuiltLocations.lastIndexOf(loc);
+                }
+                int oldnum = numberDronesBuiltNumbers.get(index);
+                if (num > oldnum) {
+                    totalNumberDronesBuilt -= oldnum;
+                    totalNumberDronesBuilt += num;
+                    numberDronesBuiltNumbers.set(index, num);
+                    System.out.println("Total number of drones: " + totalNumberDronesBuilt);
+                }
+            }
+        } else if (message[0] == MESSAGE_TYPE_DO_EARLY_SWARM) {
+            if (message[1] >= rc.getRoundNum()) {
+                earlySwarmRound = message[1];
+            }
+            System.out.println("Early swarm round: " + earlySwarmRound);
         } else {
             System.out.println("unknown message (this is probably bad)");
         }

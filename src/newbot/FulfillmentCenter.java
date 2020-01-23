@@ -16,6 +16,7 @@ public class FulfillmentCenter extends RobotPlayer {
         if (!rc.isReady()) {
             return;
         }
+        reportNumberOfDronesBuilt();
         if (tryBuildDrone()) {
         	return;
         }
@@ -73,6 +74,22 @@ public class FulfillmentCenter extends RobotPlayer {
         message[1] = myLoc;
         if (sendBlockchain(message, 1)) {
             reportedLocation = true;
+        }
+    }
+
+    public static int lastReportedCount = 0;
+    public static void reportNumberOfDronesBuilt() throws GameActionException {
+        if (dronesBuilt >= lastReportedCount+10) {
+            System.out.println("Trying to report number of drones: " + dronesBuilt);
+            int myLoc = rc.getLocation().x*MAX_MAP_SIZE + rc.getLocation().y;
+            int message[] = new int[7];
+            message[0] = MESSAGE_TYPE_NUMER_FULFILLMENT_CENTER_DRONES_BUILT;
+            message[1] = myLoc;
+            message[2] = dronesBuilt;
+            if (sendBlockchain(message, 1)) {
+                lastReportedCount = dronesBuilt;
+                System.out.println("Successfully reported number of drones built");
+            }
         }
     }
 }

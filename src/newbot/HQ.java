@@ -14,6 +14,7 @@ public class HQ extends RobotPlayer {
 
     public static void doAction() throws GameActionException {
         reportLocation();
+        tryInitiateEarlySwarm();
         if (!rc.isReady()) {
             return;
         }
@@ -50,6 +51,22 @@ public class HQ extends RobotPlayer {
         message[1] = myLoc;
         if (sendBlockchain(message, 1)) {
             reportedLocation = true;
+        }
+    }
+
+    public static boolean initiatedEarlySwarm = false;
+    public static final int dronesRequiredForEarlySwarm = 90;
+    public static void tryInitiateEarlySwarm() throws GameActionException {
+        if (rc.getRoundNum() < swarmRound-250 && totalNumberDronesBuilt >= dronesRequiredForEarlySwarm && !initiatedEarlySwarm) {
+            System.out.println("Try to initiate early swarm");
+            // initiates a swarm for 100 turns time
+            int message[] = new int[7];
+            message[0] = MESSAGE_TYPE_DO_EARLY_SWARM;
+            message[1] = rc.getRoundNum()+100;
+            if (sendBlockchain(message, 1)) {
+                initiatedEarlySwarm = true;
+                System.out.println("Initiated early swarm");
+            }
         }
     }
 
