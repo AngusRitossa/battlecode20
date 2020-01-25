@@ -9,11 +9,12 @@ public class HQ extends RobotPlayer {
     public static void runHQ() throws GameActionException {
         readBlockchain(9000);
         doAction();
-        readBlockchain(1000);
+        readBlockchain(2000);
     }
 
     public static void doAction() throws GameActionException {
         reportLocation();
+        tryInitiateEarlySwarm();
         if (!rc.isReady()) {
             return;
         }
@@ -28,11 +29,15 @@ public class HQ extends RobotPlayer {
     public static int minersBuilt = 0;
     public static boolean tryBuildMiner() throws GameActionException {
         // TODO: Don't just build miners
-        if (minersBuilt >= 8 || minersBuilt >= rc.getRoundNum()/40 + 2) {
+        if (minersBuilt >= 10 || minersBuilt >= rc.getRoundNum()/30 + 3) {
             return false;
         }
+        boolean priority = false;
+        if (rc.getRoundNum() >= landscaperStartTurtleRound && minersBuilt < 6) {
+            priority = true;
+        }
         for (Direction dir : directions) {
-            if (tryBuildInDir(RobotType.MINER, dir, false)) {
+            if (tryBuildInDir(RobotType.MINER, dir, priority)) {
                 minersBuilt++;
                 return true;
             }
@@ -50,6 +55,22 @@ public class HQ extends RobotPlayer {
         message[1] = myLoc;
         if (sendBlockchain(message, 1)) {
             reportedLocation = true;
+        }
+    }
+
+    public static boolean initiatedEarlySwarm = false;
+    public static final int dronesRequiredForEarlySwarm = 90;
+    public static void tryInitiateEarlySwarm() throws GameActionException {
+        if (rc.getRoundNum() < swarmRound-200 && totalNumberDronesBuilt >= dronesRequiredForEarlySwarm && !initiatedEarlySwarm) {
+            System.out.println("Try to initiate early swarm");
+            // initiates a swarm for 100 turns time
+            int message[] = new int[7];
+            message[0] = MESSAGE_TYPE_DO_EARLY_SWARM;
+            message[1] = rc.getRoundNum()+100;
+            if (sendBlockchain(message, 1)) {
+                initiatedEarlySwarm = true;
+                System.out.println("Initiated early swarm");
+            }
         }
     }
 

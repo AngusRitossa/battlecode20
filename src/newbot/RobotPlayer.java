@@ -32,11 +32,24 @@ public strictfp class RobotPlayer {
     public static int startRoundNum;
     public static int roundNum;
     public static MapLocation hqLoc = null; // Location of HQ.
+    public static MapLocation enemyHqLoc = null;
     public static ArrayList<MapLocation> knownRefineries = new ArrayList<MapLocation>(); // includes HQ
     public static ArrayList<MapLocation> knownRefineriesWithSoup = new ArrayList<MapLocation>(); // that that have soup near them 
     public static ArrayList<MapLocation> unreachableRefineries = new ArrayList<MapLocation>(); 
     public static ArrayList<MapLocation> knownDesignSchools = new ArrayList<MapLocation>();
+    public static ArrayList<MapLocation> knownFulfillmentCenters = new ArrayList<MapLocation>();
+    public static ArrayList<MapLocation> knownNetGuns = new ArrayList<MapLocation>(); // includes HQ
+    public static ArrayList<MapLocation> knownVaporators = new ArrayList<MapLocation>();
+    public static ArrayList<MapLocation> possibleEnemyHQLocs = new ArrayList<MapLocation>();
+    public static int totalNumberDronesBuilt = 0; // total number of drones built across all fulfillment centers
+    public static ArrayList<Integer> numberDronesBuiltLocations = new ArrayList<Integer>();
+    public static ArrayList<Integer> numberDronesBuiltNumbers = new ArrayList<Integer>();
 
+    public static final int startTurtlingHQRound = 400;
+    public static final int landscaperStartTurtleRound = 300;
+    public static final int swarmRound = 1800;
+    public static final int swarmGoAllInRound = 2050;
+    public static int earlySwarmRound = 999999; // modified by a message from the HQ
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
      * If this method returns, the robot dies!
@@ -55,10 +68,12 @@ public strictfp class RobotPlayer {
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode
             try {
                 roundNum = rc.getRoundNum();
+                /*if (roundNum == 2000) {
+                    return; // makes it easier to play games if they end at round 600
+                }*/
                 // Here, we've separated the controls into a different method for each RobotType.
                 // You can add the missing ones or rewrite this into your own control structure.
                 System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
-
                 switch (rc.getType()) {
                     case HQ:
                         HQ.runHQ();
@@ -126,14 +141,36 @@ public strictfp class RobotPlayer {
     // Used by HQ and Netguns.
     // Returns whether a unit was shot.
     public static boolean tryShootUnit() throws GameActionException {
-        // TODO: prioritise which enemy drone?
+        // prioritise drones adjacent to our units
         RobotInfo[] robots = rc.senseNearbyRobots(999999, rc.getTeam().opponent());
+        RobotInfo robotWeCanShoot = null;
+
         for (RobotInfo robot : robots) {
             if (rc.canShootUnit(robot.ID)) {
-                rc.shootUnit(robot.ID);
-                rc.setIndicatorLine(rc.getLocation(), robot.location, 255, 0, 0);
-                return true;
+                robotWeCanShoot = robot;
+                boolean adjacentToOurUnit = false;
+                for (Direction dir : directions) {
+                    MapLocation loc = robot.getLocation().add(dir);
+                    if (rc.canSenseLocation(loc)) {
+                        RobotInfo adjRobot = rc.senseRobotAtLocation(loc);
+                        if (adjRobot != null && adjRobot.team == rc.getTeam() && (adjRobot.type == RobotType.LANDSCAPER || adjRobot.type == RobotType.MINER) && !robot.isCurrentlyHoldingUnit()) {
+                            adjacentToOurUnit = true;
+                        }
+                    }
+                }
+                if (adjacentToOurUnit) {
+                    System.out.println("Shooting unit adj to friendly unit");
+                    rc.shootUnit(robot.ID);
+                    rc.setIndicatorLine(rc.getLocation(), robot.location, 255, 0, 0);
+                    return true;
+                }
             }
+        }
+        if (robotWeCanShoot != null) {
+            System.out.println("Shooting unit not adj to friendly unit");
+            rc.shootUnit(robotWeCanShoot.ID);
+            rc.setIndicatorLine(rc.getLocation(), robotWeCanShoot.location, 255, 0, 0);
+            return true;
         }
         return false;
     }
@@ -157,15 +194,18 @@ public strictfp class RobotPlayer {
         } else return false;
     }
 
-    public static final int SOUP_RESERVE_START = 100;
+    public static final int SOUP_RESERVE_START = 200;
+    public static final int SOUP_RESERVE_LOW = 400;
+    public static final int[] turnsForVaporators = { 100, 250, 400, 500, 600, 650, 700, 750, 800, 850, 900, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125, 1150, 1175, 1200, 1225, 1250, 1275, 1300 };
     public static int soupReserve() {
-        // Current formula is kinda arbitrary
-        if (roundNum < SOUP_RESERVE_START) {
-            // Don't reserve in early game if enemy is attacking
+        // Forces vaporator building
+        if (rc.getRoundNum() > swarmRound) {
             return 0;
-        } else {
-            return Math.min(250, rc.getRoundNum());
         }
+        if (knownVaporators.size() < turnsForVaporators.length && rc.getRoundNum() > turnsForVaporators[knownVaporators.size()]) {
+            return 500;
+        }
+        return 0;
     }
 
     public static boolean canAffordToBuild(RobotType unit, boolean urgent) {
@@ -322,6 +362,11 @@ public strictfp class RobotPlayer {
     public static int manhattanDistance(MapLocation a, MapLocation b) {
         return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
     }
+    public static int maxDistance(MapLocation a, MapLocation b) {
+        int dy = Math.abs(a.y - b.y);
+        int dx = Math.abs(a.x - b.x);
+        return Math.max(dy, dx);
+    }
 
 
     public static void findHQ() throws GameActionException {
@@ -345,6 +390,16 @@ public strictfp class RobotPlayer {
     public static final int MESSAGE_TYPE_REFINERY_IS_DEAD = 3;
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_LOC = 4;
     public static final int MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD = 5;
+    public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_LOC = 6;
+    public static final int MESSAGE_TYPE_FULFILLMENT_CENTER_IS_DEAD = 7;
+    public static final int MESSAGE_TYPE_ENEMY_HQ_LOC = 8;
+    public static final int MESSAGE_TYPE_NET_GUN_LOC = 9;
+    public static final int MESSAGE_TYPE_NET_GUN_IS_DEAD = 10;
+    public static final int MESSAGE_TYPE_VAPORATOR_LOC = 11;
+    public static final int MESSAGE_TYPE_VAPORATOR_IS_DEAD = 12;
+    public static final int MESSAGE_TYPE_NOT_ENEMY_HQ_LOC = 13;
+    public static final int MESSAGE_TYPE_NUMER_FULFILLMENT_CENTER_DRONES_BUILT = 14;
+    public static final int MESSAGE_TYPE_DO_EARLY_SWARM = 15;
 
     public static final int[] xorValues = { 483608780, 1381610763, 33213801, 157067759, 1704169077, 1285648416, 1172763091 };
     public static boolean sendBlockchain(int[] message, int cost) throws GameActionException {
@@ -388,7 +443,6 @@ public strictfp class RobotPlayer {
             k += 666;
         }
         k %= 42069;
-
         return k == message[6];
     }
 
@@ -408,31 +462,139 @@ public strictfp class RobotPlayer {
     }
 
     public static void interpretBlockchain(int[] message, int cost) throws GameActionException {
+        System.out.println("interpreting message");
         if (message[0] == MESSAGE_TYPE_HQ_LOC) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
             hqLoc = new MapLocation(x, y);
             knownRefineries.add(hqLoc);
             knownRefineriesWithSoup.add(hqLoc);
+
+            // store possible enemy hq positions
+            if (rc.getMapWidth() - 1 - x != x) {
+                possibleEnemyHQLocs.add(new MapLocation(rc.getMapWidth() - 1 - x, y));
+            }
+            if (rc.getMapHeight() - 1 - y != y) {
+                possibleEnemyHQLocs.add(new MapLocation(x, rc.getMapHeight() - 1 - y));
+            }
+            possibleEnemyHQLocs.add(new MapLocation(rc.getMapWidth() - 1 - x, rc.getMapHeight() - 1 - y));
+
             System.out.println("Our HQ location: " + x + " " + y);
         } else if (message[0] == MESSAGE_TYPE_REFINERY_LOC) {
             if (rc.getType() == RobotType.MINER) {
                 int x = message[1] / MAX_MAP_SIZE;
                 int y = message[1] % MAX_MAP_SIZE;
                 MapLocation loc = new MapLocation(x, y);
+                System.out.println("new refinery via blockchain");
                 knownRefineries.add(loc);
                 knownRefineriesWithSoup.add(loc);
             }
         } else if (message[0] == MESSAGE_TYPE_DESIGN_SCHOOL_LOC) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new design school via blockchain");
             MapLocation loc = new MapLocation(x, y);
-            knownDesignSchools.add(loc);
+            if (!knownDesignSchools.contains(loc)) {
+                knownDesignSchools.add(loc);
+            }
         } else if (message[0] == MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD) {
             int x = message[1] / MAX_MAP_SIZE;
             int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("design school is dead via blockchain");
             MapLocation loc = new MapLocation(x, y);
             knownDesignSchools.remove(loc);
+        } else if (message[0] == MESSAGE_TYPE_REFINERY_IS_DEAD) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            MapLocation loc = new MapLocation(x, y);
+            knownRefineries.remove(loc);
+            knownRefineriesWithSoup.remove(loc);
+            System.out.println("refinery is dead via blockchain");
+        } else if (message[0] == MESSAGE_TYPE_FULFILLMENT_CENTER_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new fulfillment center via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            if (!knownFulfillmentCenters.contains(loc)) {
+                knownFulfillmentCenters.add(loc);
+            }
+        } else if (message[0] == MESSAGE_TYPE_ENEMY_HQ_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("enemy location via blockchain");
+            possibleEnemyHQLocs.clear();
+            possibleEnemyHQLocs.add(new MapLocation(x, y));
+            enemyHqLoc = new MapLocation(x, y);
+        } else if (message[0] == MESSAGE_TYPE_NET_GUN_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new net gun via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            if (!knownNetGuns.contains(loc)) {
+                knownNetGuns.add(loc);
+            }
+        } else if (message[0] == MESSAGE_TYPE_NET_GUN_IS_DEAD) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("net gun is dead via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            knownNetGuns.remove(loc);
+        } else if (message[0] == MESSAGE_TYPE_VAPORATOR_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("new vaporator via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            if (knownVaporators.size() > 20 || !knownVaporators.contains(loc)) {
+                knownVaporators.add(loc);
+            }
+        } else if (message[0] == MESSAGE_TYPE_VAPORATOR_IS_DEAD) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("vaporator is dead via blockchain");
+            MapLocation loc = new MapLocation(x, y);
+            knownVaporators.remove(loc);
+        } else if (message[0] == MESSAGE_TYPE_NOT_ENEMY_HQ_LOC) {
+            int x = message[1] / MAX_MAP_SIZE;
+            int y = message[1] % MAX_MAP_SIZE;
+            System.out.println("found a location that isn't the enemy hq");
+            MapLocation loc = new MapLocation(x, y);
+            possibleEnemyHQLocs.remove(loc);
+            if (possibleEnemyHQLocs.size() == 1 && enemyHqLoc == null) {
+                // found enemy hq loc, report it
+                enemyHqLoc = possibleEnemyHQLocs.get(0);
+                int locToSend = enemyHqLoc.x*MAX_MAP_SIZE + enemyHqLoc.y;
+                int messageToSend[] = new int[7];
+                messageToSend[0] = MESSAGE_TYPE_ENEMY_HQ_LOC;
+                messageToSend[1] = locToSend;
+                sendBlockchain(messageToSend, 1);
+                System.out.println("found enemy hq loc");
+            }
+        } else if (message[0] == MESSAGE_TYPE_NUMER_FULFILLMENT_CENTER_DRONES_BUILT) {
+            if (rc.getType() == RobotType.HQ || rc.getType() == RobotType.FULFILLMENT_CENTER) {
+                // save bytecode by only doing this for buildings that need it
+                int loc = message[1];
+                int num = message[2];
+                int index = numberDronesBuiltLocations.lastIndexOf(loc);
+                if (index == -1) {
+                    numberDronesBuiltLocations.add(loc);
+                    numberDronesBuiltNumbers.add(0);
+                    index = numberDronesBuiltLocations.lastIndexOf(loc);
+                }
+                int oldnum = numberDronesBuiltNumbers.get(index);
+                if (num > oldnum) {
+                    totalNumberDronesBuilt -= oldnum;
+                    totalNumberDronesBuilt += num;
+                    numberDronesBuiltNumbers.set(index, num);
+                    System.out.println("Total number of drones: " + totalNumberDronesBuilt);
+                }
+            }
+        } else if (message[0] == MESSAGE_TYPE_DO_EARLY_SWARM) {
+            if (message[1] >= rc.getRoundNum()) {
+                earlySwarmRound = message[1];
+            }
+            System.out.println("Early swarm round: " + earlySwarmRound);
+        } else {
+            System.out.println("unknown message (this is probably bad)");
         }
     }
 
@@ -444,7 +606,7 @@ public strictfp class RobotPlayer {
         // Picks a random square on the board and moves towards it
         if (randomSquareMovingTowards == null || rc.getRoundNum() - turnStartedLastMovement >= 50 || rc.getLocation().distanceSquaredTo(randomSquareMovingTowards) < 20) {
             int x = (int) (Math.random() * rc.getMapWidth());
-            int y = (int) (Math.random() * rc.getMapWidth());
+            int y = (int) (Math.random() * rc.getMapHeight());
             randomSquareMovingTowards = new MapLocation(x, y);
             turnStartedLastMovement = rc.getRoundNum();
         }
@@ -454,12 +616,191 @@ public strictfp class RobotPlayer {
 
     // This function is here, rather than in landscaper, because miner needs to access it too
     // TODO: Maybe clean up file stuff so that lower turtle stuff isn't split between multiple files
+    public static final int[] turtleDigOffsetX    = { -2, 2, 0, 0 };
+    public static final int[] turtleDigOffsetY    = { 0, 0, -2, 2 };
+    public static final int lowerTurtleHeight = 10;
     public static boolean canBeDugForLowerTurtle(MapLocation loc) throws GameActionException {
         // Returns whether this square in the larger turtle can be dug from
         // Should be the case that every square has such a square adj to it
         if (hqLoc == null || loc == hqLoc) {
             return false;
         }
+        if (loc.distanceSquaredTo(hqLoc) == 4) {
+            return true;
+        }
         return (loc.x - hqLoc.x)%3 == 0 && (loc.y - hqLoc.y)%3 == 0;
+    }
+
+    public static void checkEnemyHQLocs() throws GameActionException {
+        if (possibleEnemyHQLocs.size() > 1) {
+            for (MapLocation loc : possibleEnemyHQLocs) {
+                if (rc.canSenseLocation(loc)) {
+                    RobotInfo robot = rc.senseRobotAtLocation(loc);
+                    if (robot != null && robot.team != rc.getTeam() && robot.type == RobotType.HQ) {
+
+                        possibleEnemyHQLocs.clear();
+                        possibleEnemyHQLocs.add(loc);
+                        enemyHqLoc = loc;
+                        int locToSend = enemyHqLoc.x*MAX_MAP_SIZE + enemyHqLoc.y;
+                        int message[] = new int[7];
+                        message[0] = MESSAGE_TYPE_ENEMY_HQ_LOC;
+                        message[1] = locToSend;
+                        sendBlockchain(message, 1);
+                        return;
+                    } else {
+                        possibleEnemyHQLocs.remove(loc);
+                        if (possibleEnemyHQLocs.size() == 1) {
+                            enemyHqLoc = possibleEnemyHQLocs.get(0);
+                            int locToSend = enemyHqLoc.x*MAX_MAP_SIZE + enemyHqLoc.y;
+                            int message[] = new int[7];
+                            message[0] = MESSAGE_TYPE_ENEMY_HQ_LOC;
+                            message[1] = locToSend;
+                            sendBlockchain(message, 1);
+                            return;
+                        } else {
+                            checkEnemyHQLocs();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static void updateKnownRefineries() throws GameActionException {
+        for (int i = knownRefineries.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownRefineries.get(i))) {
+                MapLocation loc = knownRefineries.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (loc != hqLoc && (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.REFINERY)) {
+                    knownRefineries.remove(i);
+                    knownRefineriesWithSoup.remove(loc);
+                    // send message proclaiming the death
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_REFINERY_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void updateKnownDesignSchools() throws GameActionException {
+        for (int i = knownDesignSchools.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownDesignSchools.get(i))) {
+                MapLocation loc = knownDesignSchools.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.DESIGN_SCHOOL) {
+                    knownDesignSchools.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead design school");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_DESIGN_SCHOOL_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void updateKnownFulfillmentCenters() throws GameActionException {
+        for (int i = knownFulfillmentCenters.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownFulfillmentCenters.get(i))) {
+                MapLocation loc = knownFulfillmentCenters.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.FULFILLMENT_CENTER) {
+                    knownFulfillmentCenters.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead fulfillment school");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_FULFILLMENT_CENTER_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void updateKnownNetGuns() throws GameActionException {
+        for (int i = knownNetGuns.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownNetGuns.get(i))) {
+                MapLocation loc = knownNetGuns.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.NET_GUN) {
+                    knownNetGuns.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead net gun");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_NET_GUN_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void updateKnownVaporators() throws GameActionException {
+        if (knownVaporators.size() > 10) {
+            return; // when we have a lot, don't both maintaining, bc bytecode
+        }
+        for (int i = knownVaporators.size() - 1; i >= 0; i--) {
+            if (rc.canSenseLocation(knownVaporators.get(i))) {
+                MapLocation loc = knownVaporators.get(i);
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null || robot.team != rc.getTeam() || robot.type != RobotType.VAPORATOR) {
+                    knownVaporators.remove(i);
+                    // send message proclaiming the death
+                    System.out.println("detected dead net gun");
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_NET_GUN_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static void lookForNewBuildings() throws GameActionException {
+        RobotInfo[] robots = rc.senseNearbyRobots(9999, rc.getTeam());
+        for (RobotInfo robot : robots) {
+            if (robot.type.isBuilding()) {
+                if (robot.type == RobotType.VAPORATOR && knownVaporators.size() < 10) {
+                    if (!knownVaporators.contains(robot.getLocation())) {
+                        knownVaporators.add(robot.getLocation());
+                    }
+                } else if (robot.type == RobotType.NET_GUN && knownNetGuns.size() < 10) {
+                    if (!knownNetGuns.contains(robot.getLocation())) {
+                        knownNetGuns.add(robot.getLocation());
+                    }
+                } else if (robot.type == RobotType.DESIGN_SCHOOL) {
+                    if (!knownDesignSchools.contains(robot.getLocation())) {
+                        knownDesignSchools.add(robot.getLocation());
+                    }
+                } else if (robot.type == RobotType.FULFILLMENT_CENTER) {
+                    if (!knownFulfillmentCenters.contains(robot.getLocation())) {
+                        knownFulfillmentCenters.add(robot.getLocation());
+                    }
+                }
+            }
+        }
+    }
+
+
+    public static boolean isGoodSquareForMinerDrop(MapLocation loc) throws GameActionException {
+        // used in delivery drones & miners
+        if (!rc.canSenseLocation(loc)) {
+            return false;
+        }
+        if (rc.getLocation().distanceSquaredTo(enemyHqLoc) > 8) {
+            return false;
+        }
+        // should have an adjacent square we can build on
+        for (Direction dir : directions) {
+            MapLocation newLoc = loc.add(dir);
+            if (rc.canSenseLocation(newLoc) && Math.abs(rc.senseElevation(newLoc) - rc.senseElevation(loc)) <= 3) {
+                return true;
+            }
+        }
+        return false;
     }
 }

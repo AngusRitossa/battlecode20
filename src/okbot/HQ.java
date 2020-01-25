@@ -8,7 +8,7 @@ import battlecode.common.RobotType;
 public class HQ extends RobotPlayer {
     public static int minersBuilt = 0;
     public static int hqBuildDirsIdx = 0;
-    public static int roundLastMinerBuilt = 0;
+    public static int roundLastMinerBuilt = -999;
     public static final int[] hqBuildDirs = {0, 4, 2, 6, 1, 5, 3, 7};
     public static int turnGapBetweenMinerBuilds = 200;
     public static void runHQ() throws GameActionException {
