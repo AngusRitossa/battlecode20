@@ -43,7 +43,7 @@ public class Miner extends RobotPlayer {
         if (tryBuildNetGunIfScared()) {
             return;
         }
-        if (runAwayFromDrone()) {
+        if (minerTryRunAwayFromDrone()) {
             return;
         }
         if (hangAroundHQ == 1 && knownVaporators.size() < 2 && rc.getLocation().distanceSquaredTo(hqLoc) > 20 && rc.getTeamSoup() > 500 && soupReserve() == 500) {
@@ -478,52 +478,6 @@ public class Miner extends RobotPlayer {
         return false;
     }
 
-    public static int disToNearestDrone(MapLocation loc, RobotInfo[] robots) throws GameActionException {
-        // returns an integer, the closest drone by maxDistance to loc, that appears in the robots array
-        int closest = 9999;
-        for (RobotInfo robot : robots) {
-            if (robot.type == RobotType.DELIVERY_DRONE) {
-                int dis = maxDistance(loc, robot.getLocation());
-                if (dis < closest) {
-                    closest = dis;
-                }
-            }
-        }
-        return closest;
-    }
-    public static boolean runAwayFromDrone() throws GameActionException {
-        // Miners are important (since its hard to produce more) and we *really* don't want to get eaten by an enemy drone
-        // So if we are close to an enemy drone, run away
-        RobotInfo[] robots = rc.senseNearbyRobots(25, rc.getTeam().opponent());
-        boolean tooCloseToEnemyDrone = disToNearestDrone(rc.getLocation(), robots) <= 3;
-        if (tooCloseToEnemyDrone) {
-            Direction bestDir = null;
-            int bestDis = -1;
-            for (Direction dir : directions) {
-                MapLocation loc = rc.getLocation().add(dir);
-                if (rc.canSenseLocation(loc)) {
-                    if (!rc.senseFlooding(loc) && rc.canMove(dir)) {
-                        int dis = disToNearestDrone(loc, robots);
-                        if (dis > bestDis) {
-                            bestDis = dis;
-                            bestDir = dir;
-                        }
-                    }
-                }
-            }
-            if (bestDir != null) {
-                if (rc.canMove(bestDir)) {
-                    System.out.println("Moving away from drone " + bestDis);
-                    rc.move(bestDir);
-                    return true;
-                } else {
-                    drawError("unable to run away even after finding appropriate direction");
-                }
-            }
-        }
-        return false;
-    }
-
     public static int closestNetGun(RobotInfo[] robots, MapLocation loc) throws GameActionException {
         int closest = 9999;
         for (RobotInfo robot : robots) {
@@ -633,6 +587,42 @@ public class Miner extends RobotPlayer {
             rc.disintegrate();
         }
         return true;
+    }
+
+    public static boolean minerTryRunAwayFromDrone() throws GameActionException {
+        // Miners are important (since its hard to produce more) and we *really* don't want to get eaten by an enemy drone
+        // So if we are close to an enemy drone, run away
+        if (rc.getRoundNum() > swarmRound) {
+            return false;
+        }
+        RobotInfo[] robots = rc.senseNearbyRobots(25, rc.getTeam().opponent());
+        boolean tooCloseToEnemyDrone = disToNearestDrone(rc.getLocation(), robots) <= 3;
+        if (tooCloseToEnemyDrone) {
+            Direction bestDir = null;
+            int bestDis = -1;
+            for (Direction dir : directions) {
+                MapLocation loc = rc.getLocation().add(dir);
+                if (rc.canSenseLocation(loc)) {
+                    if (!rc.senseFlooding(loc) && rc.canMove(dir)) {
+                        int dis = disToNearestDrone(loc, robots);
+                        if (dis > bestDis) {
+                            bestDis = dis;
+                            bestDir = dir;
+                        }
+                    }
+                }
+            }
+            if (bestDir != null) {
+                if (rc.canMove(bestDir)) {
+                    System.out.println("Moving away from drone " + bestDis);
+                    rc.move(bestDir);
+                    return true;
+                } else {
+                    drawError("unable to run away even after finding appropriate direction");
+                }
+            }
+        }
+        return false;
     }
 
 }

@@ -196,7 +196,7 @@ public strictfp class RobotPlayer {
 
     public static final int SOUP_RESERVE_START = 200;
     public static final int SOUP_RESERVE_LOW = 400;
-    public static final int[] turnsForVaporators = { 100, 250, 400, 500, 600, 650, 700, 750, 800, 850, 900, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125, 1150, 1175, 1200, 1225, 1250, 1275, 1300 };
+    public static final int[] turnsForVaporators = { 80, 120, 170, 220, 300, 400, 500, 600, 650, 700, 750, 800, 850, 900, 950, 975, 1000, 1025, 1050, 1075, 1100, 1125, 1150, 1175, 1200, 1225, 1250, 1275, 1300 };
     public static int soupReserve() {
         // Forces vaporator building
         if (rc.getRoundNum() > swarmRound) {
@@ -802,5 +802,19 @@ public strictfp class RobotPlayer {
             }
         }
         return false;
+    }
+
+    public static int disToNearestDrone(MapLocation loc, RobotInfo[] robots) throws GameActionException {
+        // returns an integer, the closest drone by maxDistance to loc, that appears in the robots array
+        int closest = 9999;
+        for (RobotInfo robot : robots) {
+            if (robot.type == RobotType.DELIVERY_DRONE) {
+                int dis = maxDistance(loc, robot.getLocation());
+                if (dis < closest) {
+                    closest = dis;
+                }
+            }
+        }
+        return closest;
     }
 }
