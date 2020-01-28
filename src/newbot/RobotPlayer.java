@@ -48,7 +48,7 @@ public strictfp class RobotPlayer {
     public static final int startTurtlingHQRound = 400;
     public static final int landscaperStartTurtleRound = 300;
     public static final int swarmRound = 1800;
-    public static final int swarmGoAllInRound = 2050;
+    public static final int swarmGoAllInRound = 2000;
     public static int earlySwarmRound = 999999; // modified by a message from the HQ
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.

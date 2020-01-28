@@ -51,6 +51,9 @@ public class DeliveryDrone extends RobotPlayer {
         		return;
         	}
         }
+        if (deliveryDroneTryProtectHQ()) {
+            return;
+        }
         if (rc.isCurrentlyHoldingUnit()) {
         	if (unitCarrying.team != rc.getTeam()) {
         		if (tryDropUnitIntoWater()) {
@@ -486,5 +489,39 @@ public class DeliveryDrone extends RobotPlayer {
     		}
     	}
     	return false;
+    }
+
+    public static boolean isGoodDeliveryDroneWallSquare(MapLocation loc) throws GameActionException {
+        // returns true if this square is on the outside of the 5x5 square around hq
+        if (loc.distanceSquaredTo(hqLoc) >= 4 && loc.distanceSquaredTo(hqLoc) <= 8) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    public static boolean deliveryDroneTryProtectHQ() throws GameActionException {
+        // form a wall around the hq, on the border of the 5x5 square around the hq
+        if (hqLoc == null || rc.getRoundNum() < water_level_round[lowerTurtleHeight] || rc.isCurrentlyHoldingUnit()) {
+            return false;
+        }
+        if (isGoodDeliveryDroneWallSquare(rc.getLocation())) {
+            return true;
+        }
+        for (int i = 0; i < offsetDist.length; i++) {
+            if (offsetDist[i] < 4) {
+                continue;
+            } else if (offsetDist[i] > 8) {
+                break;
+            }
+            MapLocation loc = hqLoc.translate(offsetX[i], offsetY[i]);
+            if (rc.canSenseLocation(loc)) {
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null) {
+                    System.out.println("Trying to form wall around hq");
+                    return deliveryDroneTryMoveTowards(loc);
+                }
+            }
+        }
+        return false;
     }
 }
