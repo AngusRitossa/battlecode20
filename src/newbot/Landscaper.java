@@ -11,6 +11,7 @@ public class Landscaper extends RobotPlayer {
     public static void doAction() throws GameActionException {
         updateAdjHQSquares();
         checkEnemyHQLocs();
+        findLineBetweenHQs();
         if (!rc.isReady()) {
             return;
         }
@@ -344,6 +345,11 @@ public class Landscaper extends RobotPlayer {
         if ((rc.senseElevation(loc) < -20 && !loc.isAdjacentTo(hqLoc)) || rc.senseElevation(loc) >= lowerTurtleHeight || canBeDugForLowerTurtle(loc)) {
             return false;
         }
+        if (foundLine && disBetweenPointAndLine(loc) > 100) {
+        	// this means we won't deviate by more than r^2 150 from the line between us and enemy hq
+        	// meaning we turtle towards the enemy hq (ish)
+        	return false;
+        }
         RobotInfo robot = rc.senseRobotAtLocation(loc);
         if (robot != null && robot.team == rc.getTeam() && robot.type.isBuilding()) {
             return false;
@@ -526,5 +532,30 @@ public class Landscaper extends RobotPlayer {
             return tryMoveTowards(hqLoc);
         }
         return false;
+    }
+
+    public static boolean foundLine = false;
+    public static int lineA = 0, lineB = 0, lineC = 0;
+    public static int divideBy = 1;
+    public static void findLineBetweenHQs() {
+    	// Finds the line between the enemy HQ and ours, used to turtle towards enemy hq
+    	if (hqLoc == null || enemyHqLoc == null || foundLine) {
+    		return;
+    	}
+    	foundLine = true;
+    	int a = hqLoc.x, b = hqLoc.y, c = enemyHqLoc.x, d = enemyHqLoc.y;
+    	lineA = (d-b);
+    	lineB = (a-c);
+    	lineC = -a*lineA - b*lineB;
+    	int c2 = -c*lineA - d*lineB;
+    	if (lineC != c2) {
+    		drawError("line is wrong");
+    	}
+    	divideBy = lineA*lineA + lineB*lineB;
+    	System.out.println("Found line: " + lineA + "x + " + lineB + "y + " + lineC + ", " + divideBy);
+    }
+    public static int disBetweenPointAndLine(MapLocation loc) {
+    	int d = (lineA*loc.x + lineB*loc.y + lineC);
+    	return (d*d)/divideBy;
     }
 }
