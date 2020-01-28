@@ -523,14 +523,22 @@ public class Miner extends RobotPlayer {
         int closestNetGun = 9999;
         int enemyDrones = 0;
         int requiredDistanceToNearestNetGun = 15;
-        if (rc.getLocation().distanceSquaredTo(hqLoc) > 25) {
-        	requiredDistanceToNearestNetGun = 25;
-        }
-        if (rc.getLocation().distanceSquaredTo(hqLoc) > 50) {
-        	requiredDistanceToNearestNetGun = 40;
-        }
-        if (rc.getLocation().distanceSquaredTo(hqLoc) > 80) {
-        	requiredDistanceToNearestNetGun = 999999;
+        if (knownVaporators.size() < 5) {
+            if (rc.getLocation().distanceSquaredTo(hqLoc) > 25) {
+                requiredDistanceToNearestNetGun = 25;
+            }
+            if (rc.getLocation().distanceSquaredTo(hqLoc) > 50) {
+                requiredDistanceToNearestNetGun = 40;
+            }
+            if (rc.getLocation().distanceSquaredTo(hqLoc) > 80) {
+                requiredDistanceToNearestNetGun = 999999;
+            }
+        } else {
+            // when we have enough vaporators, we can spend more
+            requiredDistanceToNearestNetGun = 10;
+            if (rc.getLocation().distanceSquaredTo(hqLoc) > 50) {
+                requiredDistanceToNearestNetGun = 15;
+            }
         }
         for (RobotInfo robot : robots) {
             if (robot.type == RobotType.DELIVERY_DRONE && robot.team != rc.getTeam()) {
