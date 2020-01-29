@@ -18,6 +18,7 @@ public class DeliveryDrone extends RobotPlayer {
     public static boolean participatingInEarlySwarm = false;
     public static void doAction() throws GameActionException {
         checkEnemyHQLocs();
+        updateEnemyNetGuns();
     	if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
             hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
@@ -321,10 +322,10 @@ public class DeliveryDrone extends RobotPlayer {
     	// if arr[i] is true, that means directions[i] is in range of a net gun
         ArrayList<MapLocation> nearbyNetGuns = new ArrayList<MapLocation>();
         if (enemyHqLoc != null) nearbyNetGuns.add(enemyHqLoc);
-        RobotInfo robots[] = rc.senseNearbyRobots(9999, rc.getTeam().opponent());
-        for (RobotInfo robot : robots) {
-        	if (robot.type == RobotType.NET_GUN || robot.type == RobotType.HQ) {
-        		nearbyNetGuns.add(robot.getLocation());
+
+        for (MapLocation loc : knownEnemyNetGuns) {
+        	if (rc.getLocation().distanceSquaredTo(loc) <= 35) {
+        		nearbyNetGuns.add(loc);
         	}
         }
         for (int i = 0; i < directions.length; i++) {
@@ -523,5 +524,40 @@ public class DeliveryDrone extends RobotPlayer {
             }
         }
         return false;
+    }
+
+    public static void updateEnemyNetGuns() throws GameActionException {
+        // first, remove any that don't exist
+        for (int i = knownEnemyNetGuns.size() - 1; i >= 0; i--) {
+            MapLocation loc = knownEnemyNetGuns.get(i);
+            if (rc.canSenseLocation(loc)) {
+                 RobotInfo robot = rc.senseRobotAtLocation(loc);
+                 if (robot == null || robot.team == rc.getTeam() || robot.type != RobotType.NET_GUN) {
+                    System.out.println("enemy net gun dead");
+                    knownEnemyNetGuns.remove(i);
+                    // send message proclaiming the death
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_ENEMY_NETGUN_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                 }
+            }
+        }
+
+        // check for new ones
+        RobotInfo robots[] = rc.senseNearbyRobots(9999, rc.getTeam().opponent());
+        for (RobotInfo robot : robots) {
+            if (robot.type == RobotType.NET_GUN) {
+                MapLocation loc = robot.getLocation();
+                if (!knownEnemyNetGuns.contains(loc)) {
+                    System.out.println("found enemy net gun");
+                    knownEnemyNetGuns.add(loc);
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_ENEMY_NETGUN_LOC;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
     }
 }
