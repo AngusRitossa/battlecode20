@@ -75,6 +75,9 @@ public class DeliveryDrone extends RobotPlayer {
                         }
                     }
                 } else if (unitCarrying.type == RobotType.LANDSCAPER) {
+                    if (tryDropLandscaperNextToOurHq()) {
+                        return;
+                    }
                     if (tryDropLandscaperNextToEnemyHq()) {
                         return;
                     }
@@ -559,5 +562,25 @@ public class DeliveryDrone extends RobotPlayer {
                 }
             }
         }
+    }
+
+    public static boolean tryDropLandscaperNextToOurHq() throws GameActionException {
+        // complete our turtle if we can
+        if (unitCarrying == null || unitCarrying.type != RobotType.LANDSCAPER || hqLoc == null) {
+            return false;
+        }
+        for (Direction dir : directions) {
+            MapLocation loc = rc.getLocation().add(dir);
+            if (rc.canSenseLocation(loc)) {
+                if (loc.isAdjacentTo(hqLoc)) {
+                    if (rc.canDropUnit(dir)) {
+                        System.out.println("dropping unit onto adj square to hq");
+                        rc.dropUnit(dir);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }
