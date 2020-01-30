@@ -18,6 +18,7 @@ public class DeliveryDrone extends RobotPlayer {
     public static boolean participatingInEarlySwarm = false;
     public static void doAction() throws GameActionException {
         checkEnemyHQLocs();
+        updateEnemyNetGuns();
     	if (hangAroundHQ == -1 && hqLoc != null) {
             hangAroundHQ = (int) (Math.random() * 420);
             hangAroundHQ += rc.getLocation().x + rc.getLocation().y + Clock.getBytecodesLeft();
@@ -51,6 +52,9 @@ public class DeliveryDrone extends RobotPlayer {
         		return;
         	}
         }
+        if (deliveryDroneTryProtectHQ()) {
+            return;
+        }
         if (rc.isCurrentlyHoldingUnit()) {
         	if (unitCarrying.team != rc.getTeam()) {
         		if (tryDropUnitIntoWater()) {
@@ -71,6 +75,9 @@ public class DeliveryDrone extends RobotPlayer {
                         }
                     }
                 } else if (unitCarrying.type == RobotType.LANDSCAPER) {
+                    if (tryDropLandscaperNextToOurHq()) {
+                        return;
+                    }
                     if (tryDropLandscaperNextToEnemyHq()) {
                         return;
                     }
@@ -318,10 +325,10 @@ public class DeliveryDrone extends RobotPlayer {
     	// if arr[i] is true, that means directions[i] is in range of a net gun
         ArrayList<MapLocation> nearbyNetGuns = new ArrayList<MapLocation>();
         if (enemyHqLoc != null) nearbyNetGuns.add(enemyHqLoc);
-        RobotInfo robots[] = rc.senseNearbyRobots(9999, rc.getTeam().opponent());
-        for (RobotInfo robot : robots) {
-        	if (robot.type == RobotType.NET_GUN || robot.type == RobotType.HQ) {
-        		nearbyNetGuns.add(robot.getLocation());
+
+        for (MapLocation loc : knownEnemyNetGuns) {
+        	if (rc.getLocation().distanceSquaredTo(loc) <= 35) {
+        		nearbyNetGuns.add(loc);
         	}
         }
         for (int i = 0; i < directions.length; i++) {
@@ -486,5 +493,94 @@ public class DeliveryDrone extends RobotPlayer {
     		}
     	}
     	return false;
+    }
+
+    public static boolean isGoodDeliveryDroneWallSquare(MapLocation loc) throws GameActionException {
+        // returns true if this square is on the outside of the 5x5 square around hq
+        if (loc.distanceSquaredTo(hqLoc) >= 4 && loc.distanceSquaredTo(hqLoc) <= 8) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    public static boolean deliveryDroneTryProtectHQ() throws GameActionException {
+        // form a wall around the hq, on the border of the 5x5 square around the hq
+        if (hqLoc == null || rc.getRoundNum() < water_level_round[lowerTurtleHeight] || rc.isCurrentlyHoldingUnit()) {
+            return false;
+        }
+        if (isGoodDeliveryDroneWallSquare(rc.getLocation())) {
+            return true;
+        }
+        for (int i = 0; i < offsetDist.length; i++) {
+            if (offsetDist[i] < 4) {
+                continue;
+            } else if (offsetDist[i] > 8) {
+                break;
+            }
+            MapLocation loc = hqLoc.translate(offsetX[i], offsetY[i]);
+            if (rc.canSenseLocation(loc)) {
+                RobotInfo robot = rc.senseRobotAtLocation(loc);
+                if (robot == null) {
+                    System.out.println("Trying to form wall around hq");
+                    return deliveryDroneTryMoveTowards(loc);
+                }
+            }
+        }
+        return false;
+    }
+
+    public static void updateEnemyNetGuns() throws GameActionException {
+        // first, remove any that don't exist
+        for (int i = knownEnemyNetGuns.size() - 1; i >= 0; i--) {
+            MapLocation loc = knownEnemyNetGuns.get(i);
+            if (rc.canSenseLocation(loc)) {
+                 RobotInfo robot = rc.senseRobotAtLocation(loc);
+                 if (robot == null || robot.team == rc.getTeam() || robot.type != RobotType.NET_GUN) {
+                    System.out.println("enemy net gun dead");
+                    knownEnemyNetGuns.remove(i);
+                    // send message proclaiming the death
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_ENEMY_NETGUN_IS_DEAD;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                 }
+            }
+        }
+
+        // check for new ones
+        RobotInfo robots[] = rc.senseNearbyRobots(9999, rc.getTeam().opponent());
+        for (RobotInfo robot : robots) {
+            if (robot.type == RobotType.NET_GUN) {
+                MapLocation loc = robot.getLocation();
+                if (!knownEnemyNetGuns.contains(loc)) {
+                    System.out.println("found enemy net gun");
+                    knownEnemyNetGuns.add(loc);
+                    int[] message = new int[7];
+                    message[0] = MESSAGE_TYPE_ENEMY_NETGUN_LOC;
+                    message[1] = loc.x * MAX_MAP_SIZE + loc.y;
+                    sendBlockchain(message, 1);
+                }
+            }
+        }
+    }
+
+    public static boolean tryDropLandscaperNextToOurHq() throws GameActionException {
+        // complete our turtle if we can
+        if (unitCarrying == null || unitCarrying.type != RobotType.LANDSCAPER || hqLoc == null) {
+            return false;
+        }
+        for (Direction dir : directions) {
+            MapLocation loc = rc.getLocation().add(dir);
+            if (rc.canSenseLocation(loc)) {
+                if (loc.isAdjacentTo(hqLoc)) {
+                    if (rc.canDropUnit(dir)) {
+                        System.out.println("dropping unit onto adj square to hq");
+                        rc.dropUnit(dir);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

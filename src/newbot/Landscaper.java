@@ -11,14 +11,19 @@ public class Landscaper extends RobotPlayer {
     public static void doAction() throws GameActionException {
         updateAdjHQSquares();
         checkEnemyHQLocs();
+        findLineBetweenHQs();
         if (!rc.isReady()) {
             return;
         }
         if (lastRoundBuiltTurtle == 9999) {
             lastRoundBuiltTurtle = Math.max(rc.getRoundNum(), landscaperStartTurtleRound);
         }
+
         if (rc.getRoundNum() > landscaperStartTurtleRound) {
         	if (tryAttackOrDefendBuilding(true)) {
+            	return;
+        	}
+        	if (landscaperTryRunAwayFromDrone()) {
             	return;
         	}
         	if (rc.getRoundNum() > 800 && tryFormHQTurtle()) {
@@ -45,6 +50,9 @@ public class Landscaper extends RobotPlayer {
     	if (rc.getLocation().distanceSquaredTo(hqLoc) > 15) {
     		return tryMoveTowards(hqLoc);
     	}
+    	if (landscaperTryRunAwayFromDrone()) {
+            return true;
+        }
         if (trySlightlyRaiseAroundHq()) {
             return true;
         }
@@ -277,7 +285,7 @@ public class Landscaper extends RobotPlayer {
     	// dig dirt from an allowed location in the turtle
         for (Direction dir : directions) {
             MapLocation loc = rc.getLocation().add(dir);
-            if (canBeDugForLowerTurtle(loc) && rc.canDigDirt(dir)) {
+            if ((canBeDugForLowerTurtle(loc) || shouldBeLoweredForLowerTurtle(loc)) && rc.canDigDirt(dir)) {
                 System.out.println("Digging dirt for turtle");
                 rc.digDirt(dir);
                 return true;
@@ -335,6 +343,25 @@ public class Landscaper extends RobotPlayer {
         // Checks that the square isn't too low (if its too low, just give up on it)
         // Important: Assumes we can sense the location
         if ((rc.senseElevation(loc) < -20 && !loc.isAdjacentTo(hqLoc)) || rc.senseElevation(loc) >= lowerTurtleHeight || canBeDugForLowerTurtle(loc)) {
+            return false;
+        }
+        if (foundLine && disBetweenPointAndLine(loc) > 100) {
+        	// this means we won't deviate by more than r^2 150 from the line between us and enemy hq
+        	// meaning we turtle towards the enemy hq (ish)
+        	return false;
+        }
+        RobotInfo robot = rc.senseRobotAtLocation(loc);
+        if (robot != null && robot.team == rc.getTeam() && robot.type.isBuilding()) {
+            return false;
+        }
+        return true;
+    }
+    public static boolean shouldBeLoweredForLowerTurtle(MapLocation loc) throws GameActionException {
+    	// Checks that the square can't be walked on from the lower turtle height, and that is isn't too high that we should give up on it
+        if (!rc.canSenseLocation(loc)) {
+        	return false;
+        }
+        if (rc.senseElevation(loc) <= lowerTurtleHeight+3 || loc.isAdjacentTo(hqLoc) || rc.senseElevation(loc) >= 50 || canBeDugForLowerTurtle(loc)) {
             return false;
         }
         RobotInfo robot = rc.senseRobotAtLocation(loc);
@@ -397,6 +424,17 @@ public class Landscaper extends RobotPlayer {
                         return true;
                     }
                 } else {
+                	// check to see if we can lower an adj square we can lower for the turtle
+                	if (rc.getDirtCarrying() < RobotType.LANDSCAPER.dirtLimit) {
+                		for (Direction dir : Direction.allDirections()) {
+                			MapLocation loc = rc.getLocation().add(dir);
+                			if (shouldBeLoweredForLowerTurtle(loc) && rc.canDigDirt(dir)) {
+                				rc.digDirt(dir);
+                				System.out.println("lowering square for turtle");
+                				return true;
+                			}
+                		}
+                	}
                     System.out.println("moving towards bestloc " + Clock.getBytecodesLeft());
                     tryMoveTowards(bestLoc);
                     return true;
@@ -426,7 +464,7 @@ public class Landscaper extends RobotPlayer {
 
     public static final int saveDirtLimit = 15;
     public static boolean trySaveUpDirt() throws GameActionException {
-    	if (rc.getDirtCarrying() > 15) {
+    	if (rc.getDirtCarrying() > saveDirtLimit) {
     		return false;
     	}
     	System.out.println("digging dirt bc I have nothing else to do");
@@ -478,5 +516,46 @@ public class Landscaper extends RobotPlayer {
             return tryMoveTowards(bestLoc);
         }
         return false;
+    }
+
+
+    public static boolean landscaperTryRunAwayFromDrone() throws GameActionException {
+        // Run towards hq
+        // So if we are close to an enemy drone, run away
+        if (rc.getRoundNum() > swarmRound) {
+            return false;
+        }
+        RobotInfo[] robots = rc.senseNearbyRobots(25, rc.getTeam().opponent());
+        boolean tooCloseToEnemyDrone = disToNearestDrone(rc.getLocation(), robots) <= 3;
+        if (tooCloseToEnemyDrone) {
+            System.out.println("Seen enemy drone - moving towards hq");
+            return tryMoveTowards(hqLoc);
+        }
+        return false;
+    }
+
+    public static boolean foundLine = false;
+    public static int lineA = 0, lineB = 0, lineC = 0;
+    public static int divideBy = 1;
+    public static void findLineBetweenHQs() {
+    	// Finds the line between the enemy HQ and ours, used to turtle towards enemy hq
+    	if (hqLoc == null || enemyHqLoc == null || foundLine) {
+    		return;
+    	}
+    	foundLine = true;
+    	int a = hqLoc.x, b = hqLoc.y, c = enemyHqLoc.x, d = enemyHqLoc.y;
+    	lineA = (d-b);
+    	lineB = (a-c);
+    	lineC = -a*lineA - b*lineB;
+    	int c2 = -c*lineA - d*lineB;
+    	if (lineC != c2) {
+    		drawError("line is wrong");
+    	}
+    	divideBy = lineA*lineA + lineB*lineB;
+    	System.out.println("Found line: " + lineA + "x + " + lineB + "y + " + lineC + ", " + divideBy);
+    }
+    public static int disBetweenPointAndLine(MapLocation loc) {
+    	int d = (lineA*loc.x + lineB*loc.y + lineC);
+    	return (d*d)/divideBy;
     }
 }
